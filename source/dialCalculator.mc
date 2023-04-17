@@ -1,5 +1,15 @@
 import Toybox.Lang;
+import Toybox.Test;
 
+// Calculations to arrange the 24 hours of the day around the dial, so that:
+// - sunrise always appears at the precise left corner (270°)
+// - sunset is at the right corner (90°)
+//
+// The hours of the days are spread evenly across the top half of the dial, and the
+// hour of the night around the bottom half.
+//
+// Note: this layout makes sense if the sun is in the southern sky, so that it rises
+// on your left as you look to the south.
 class DialCalculator {
     // Time, in hours since midnight local time, of the sunrise today
     private var sunrise as Float = 6.0;
@@ -54,8 +64,8 @@ class DialCalculator {
             angle = Math.PI*eveningFraction;
         }
 
-        tcos = Math.cos(angle);
-        tsin = Math.sin(angle);
+        tcos = Math.cos(angle).toFloat();
+        tsin = Math.sin(angle).toFloat();
     }
 
     function isDay() as Boolean {
@@ -69,10 +79,35 @@ class DialCalculator {
     }
 
     public function x() as Number {
-        return Math.round(width/2 + radius*tcos);
+        return Math.round(width/2 + radius*tcos).toNumber();
     }
 
     public function y() as Number {
-        return Math.round(height/2 + radius*tsin);
+        return Math.round(height/2 + radius*tsin).toNumber();
     }
+}
+
+(:test)
+function testNoon(logger as Logger) as Boolean {
+    var calc = new DialCalculator(260, 260);
+    calc.setRadius(1.0);
+
+    // 2020-04-16 in Hamden, CT:
+    var sunrise = 6 + 11/60.0;
+    var sunset = 19 + 34/60.0;
+    calc.setSunTimes(sunrise, sunset);
+
+    calc.setValue(sunrise);
+    assertEqualLog(calc.x(), 0, logger);
+    assertEqualLog(calc.y(), 130, logger);
+
+    calc.setValue(12.0);
+    assertEqualLog(calc.x(), 103, logger);
+    assertEqualLog(calc.y(), 3, logger);
+
+    calc.setValue(sunset);
+    assertEqualLog(calc.x(), 260, logger);
+    assertEqualLog(calc.y(), 130, logger);
+
+    return true;
 }

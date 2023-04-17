@@ -62,7 +62,7 @@ class moonfaceView extends WatchUi.WatchFace {
 
         // some bogus animation just to move it around for now:
         var moonAzimuth = 1.75 + (now - sunset)*Math.PI/12;
-        var moonAltitude = 0.5*Math.cos(moonAzimuth);
+        var moonAltitude = 0.5*Math.cos(moonAzimuth).toFloat();
         var moonParallactic = moonAzimuth - 0.15;
 
         var isDay = now >= sunrise && now <= sunset;
