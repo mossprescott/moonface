@@ -6,7 +6,7 @@ import Toybox.Time;
 import Toybox.Test;
 
 // Just to make it clear when a quantity is an angle, and in what units.
-// Note: We need to use Doubles to represent time with precision, and those tiems often get
+// Note: We need to use Doubles to represent time with precision, and those times often get
 // scaled to produce angles which become the inputs to the trig functions, so it's simpler to
 // just define all angles as either Double or Float.
 // Angles coming back from inverse functions are always small, so Float would be plenty,
@@ -89,15 +89,15 @@ class Orbits {
         return toRadians(280.16 + 360.9856235 * d) - lw;
     }
 
-    // func astroRefraction(h : Double) -> Double {
-    //     // the following formula works for positive altitudes only.
-    //     // if h = -0.08901179 a div/0 would occur.
-    //     let h = (h < 0) ? 0 : h
+    private static function astroRefraction(h as Radians) as Radians {
+        // the following formula works for positive altitudes only.
+        // if h = -0.08901179 a div/0 would occur.
+        if (h < 0) { h = 0; }
 
-    //     // formula 16.4 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
-    //     // 1.02 / tan(h + 10.26 / (h + 5.10)) h in degrees, result in arc minutes -> converted to rad:
-    //     return 0.0002967 / tan(h + 0.00312536 / (h + 0.08901179))
-    // }
+        // formula 16.4 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
+        // 1.02 / tan(h + 10.26 / (h + 5.10)) h in degrees, result in arc minutes -> converted to rad:
+        return 0.0002967 / tan(h + 0.00312536 / (h + 0.08901179));
+    }
 
 
     //
@@ -205,11 +205,6 @@ class Orbits {
 
         var Jnoon = solarTransitJ(ds, M, L);
 
-        // // HACK:
-        // System.println(formatTime(date));
-        // System.println(formatTime(fromJulian(Jnoon)));
-        // // seems to be off by one day
-
         // Angles (altitudes?) of the sun at various times of potential interest:
         var riseAngle = -0.8333;
         // var riseEndAngle = -0.3;
@@ -228,6 +223,152 @@ class Orbits {
             :set => fromJulian(Jset),
         };
     }
+
+    //
+    // Moon calculations:
+    //
+
+    // :ra, :dec in Radians
+    // :dist in km
+    private static function moonCoords(d as Days) as Dictionary<Symbol, Decimal> {
+        var L = toRadians(218.316 + 13.176396 * d); // ecliptic longitude
+        var M = toRadians(134.963 + 13.064993 * d); // mean anomaly
+        var F = toRadians(93.272 + 13.229350 * d);  // mean distance
+
+        var l  = L + toRadians(6.289) * sin(M); // longitude
+        var b  = toRadians(5.128) * sin(F);     // latitude
+        var dt = 385001 - 20905 * cos(M);  // distance to the moon in km
+
+        return {
+            :ra => rightAscension(l, b),
+            :dec => declination(l, b),
+            :dist => dt,
+        };
+    }
+
+    // Position of the moon in the sky, given the viewer's location.
+    // { :azimuth, :altitude, :distance (km), :parallacticAngle }
+    public static function moonPosition(date as Moment, loc /*as Position*/) as Dictionary<Symbol, Decimal> {
+        var coords = loc.toRadians();
+        var lw  = -coords[1];
+        var phi = coords[0];
+        var d   = toDays(date);
+
+        var c = erase(moonCoords(d));
+        var H = siderealTime(d, lw) - c.get(:ra);
+        var h = altitude(H, phi, c.get(:dec));
+        // formula 14.1 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
+        var pa = atan2(sin(H), tan(phi)*cos(c.get(:dec)) - sin(c.get(:dec))*cos(H));
+
+        var correctedH = h + astroRefraction(h); // altitude correction for refraction
+
+        return {
+            :azimuth => azimuth(H, phi, c.get(:dec)),
+            :altitude => correctedH,
+            :distance => c.get(:dist),
+            :parallacticAngle => pa,
+        };
+    }
+
+
+    // /// calculations for illumination parameters of the moon,
+    // /// based on http://idlastro.gsfc.nasa.gov/ftp/pro/astro/mphase.pro formulas and
+    // /// Chapter 48 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
+    // /// Note: these parameters are independent of viewing location. We all see the same moon!
+    // public static func getIllumination(_ date: Date) -> (fraction: Double, phase: Double, angle: Double) {
+
+    //     let d = toDays(date)
+    //     let s = sunCoords(d)
+    //     let m = coords(d)
+
+    //     let sdist = 149598000.0 // distance from Earth to Sun in km
+
+    //     let phi = acos(sin(s.dec) * sin(m.dec) + cos(s.dec) * cos(m.dec) * cos(s.ra - m.ra))
+    //     let inc = atan2(sdist * sin(phi), m.dist - sdist * cos(phi))
+    //     let angle = atan2(cos(s.dec) * sin(s.ra - m.ra), sin(s.dec) * cos(m.dec) -
+    //                 cos(s.dec) * sin(m.dec) * cos(s.ra - m.ra))
+
+    //     return (
+    //         fraction: (1 + cos(inc)) / 2,
+    //         phase: 0.5 + 0.5 * inc * (angle < 0 ? -1 : 1) / pi,
+    //         angle: angle
+    //     )
+    // }
+
+
+    // public enum RiseAndSet {
+    //     case alwaysUp
+    //     case alwaysDown
+    //     case times(Date, Date)
+    // }
+
+    // /// calculations for moon rise/set times are based on http://www.stargazing.net/kepler/moonrise.html article
+    // public static func getTimes(_ date: Date, lat: Double, lng: Double, inUTC: Bool) -> RiseAndSet {
+    //     var calendar = Calendar.current
+    //     if (inUTC) {
+    //         calendar.timeZone = TimeZone.gmt
+    //     }
+    //     let t = Calendar.current.startOfDay(for: date)
+
+    //     let hc = 0.133 * rad
+    //     var h0 = getPosition(t, lat: lat, lng: lng).altitude - hc
+
+    //     var rise: Double? = nil
+    //     var set: Double? = nil
+    //     var ye = 0.0
+    //    // go in 2-hour chunks, each time seeing if a 3-point quadratic curve crosses zero (which means rise or set)
+    //     for hi in 0...11 {
+    //         let i = 2*hi + 1  // odd hours from 01 to 23
+    //         let h1 = getPosition(t.later(byHours: Double(i)), lat: lat, lng: lng).altitude - hc
+    //         let h2 = getPosition(t.later(byHours: Double(i + 1)), lat: lat, lng: lng).altitude - hc
+
+    //         let a = (h0 + h2) / 2 - h1
+    //         let b = (h2 - h0) / 2
+    //         let xe = -b / (2 * a)
+    //         ye = (a * xe + b) * xe + h1
+    //         let d = b * b - 4 * a * h1
+
+    //         var roots = 0
+    //         var x1: Double = 0
+    //         var x2: Double = 0
+    //         if (d >= 0) {
+    //             let dx = sqrt(d) / (abs(a) * 2)
+    //             x1 = xe - dx
+    //             x2 = xe + dx
+    //             if abs(x1) <= 1 { roots += 1 }
+    //             if abs(x2) <= 1 { roots += 1 }
+    //             if x1 < -1 { x1 = x2 }
+    //         }
+
+    //         if roots == 1 {
+    //             if (h0 < 0) { rise = Double(i) + x1 }
+    //             else { set = Double(i) + x1 }
+
+    //         } else if roots == 2 {
+    //             rise = Double(i) + (ye < 0 ? x2 : x1);
+    //             set = Double(i) + (ye < 0 ? x1 : x2);
+    //         }
+
+    //         if (rise != nil) && (set != nil) {
+    //             break
+    //         }
+
+    //         h0 = h2
+    //     }
+
+    //     switch (rise, set) {
+    //     case (nil, nil):
+    //         if ye > 0 {
+    //             return .alwaysUp
+    //         }
+    //         else {
+    //             return .alwaysDown
+    //         }
+    //     default:
+    //         return .times(t.later(byHours: rise ?? 0), t.later(byHours: set ?? 0))
+    //     }
+    // }
+
 }
 
 (:test)
@@ -299,7 +440,21 @@ function testSunTimes2(logger as Logger) as Boolean {
     return true;
 }
 
-// HH:MM for tests
+(:test)
+function testMoonPosition(logger as Logger) as Boolean {
+    var april17 = new Moment(1681754720);
+    var hamden = new Position.Location({:latitude => 41.3460, :longitude => -72.9125, :format => :degrees});
+
+    var pos = Orbits.moonPosition(april17, hamden);
+    assertApproximatelyEqual(pos.get(:azimuth),          0.9277, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:altitude),         0.5089, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:distance),      369507.90,  1.0, logger);
+    assertApproximatelyEqual(pos.get(:parallacticAngle), 0.6464, 0.01, logger);
+
+    return true;
+}
+
+// HH:MM for tests (local time)
 (:debug)
 function formatTime(time as Moment) as String {
     var today = Gregorian.info(time, Time.FORMAT_SHORT);
