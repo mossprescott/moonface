@@ -52,9 +52,9 @@ class Orbits {
         return date.value().toDouble()/daySecs - 0.5 + julian1970;
     }
 
-    // func fromJulian(_ julian: Julian) -> Date {
-    //     Date(timeIntervalSince1970: (julian.days + 0.5 - j1970) * daySecs)
-    // }
+    private static function fromJulian(julian as Julian) as Moment {
+        return new Moment(erase((julian + 0.5 - julian1970) * daySecs).toNumber());
+    }
 
     // Date-time as number of days since noon on the first day of the year 2000?
     // Invented to simplify the calculation and/or improve their precision?
@@ -152,42 +152,107 @@ class Orbits {
         return x;
     }
 
+    private static var julian0 = 0.0009;
+
+    // TODO: units? Days/revolutions, but on what basis?
+    private static function julianCycle(d as Days, lw as Radians) as Number {
+        return Math.round((d - julian0 - lw / (2 * Math.PI)));
+    }
+
+    private static function approxTransit(Ht as Radians, lw as Radians, n as Number) as Days {
+        return julian0 + (Ht + lw) / (2 * Math.PI) + n;
+    }
+    private static function solarTransitJ(ds as Days, M as Radians, L as Radians) as Julian {
+        return julian2000 + ds + 0.0053*sin(M) - 0.0069*sin(2*L);
+    }
+
+    private static function hourAngle(h as Radians, phi as Radians, d as Radians) as Radians {
+        return acos((sin(h) - sin(phi)*sin(d)) / (cos(phi)*cos(d)));
+    }
+    private static function observerAngle(height as Float) as Degrees {
+        return -2.076 * Math.sqrt(height) / 60;
+    }
+
+    // returns set time for the given sun altitude
+    private static function getSetJ(h as Radians, lw as Radians, phi as Radians, dec as Radians, n as Number, M as Radians, L as Radians) as Julian {
+        var w = hourAngle(h, phi, dec);
+        var a = approxTransit(w, lw, n);
+        return solarTransitJ(a, M, L);
+    }
+
     // Times for the sun on the given day, at the viewer's position, including:
-    // { :rise, :set }
+    // { :noon, :nadir, :rise, :set }
     //
     // `date` should be midnight local time, or really any time prior to sunrise.
+    // `height` is in meters (or just use 0).
     //
     // Note: for our purposes, local time of day would be more useful, but this is at least
     // clearly defined and you can get there from here.
-    public static function sunTimes(date as Moment, loc as Location) as Dictionary<Symbol, Moment> {
+    public static function sunTimes(date as Moment, loc /*as Location*/, height as Float) as Dictionary<Symbol, Moment> {
+        var coords = loc.toRadians();
+        var lw  = -coords[1];
+        var phi = coords[0];
+
+        var dh = observerAngle(height);
+
+        var d = toDays(date) + 0.5;  // HACK: if date is actually (local) midnight, as expected, we end up with yesterday's times.
+        var n = julianCycle(d, lw);
+        var ds = approxTransit(0.0, lw, n);
+
+        var M = solarMeanAnomaly(ds);
+        var L = eclipticLongitude(M);
+        var dec = declination(L, 0.0);
+
+        var Jnoon = solarTransitJ(ds, M, L);
+
+        // // HACK:
+        // System.println(formatTime(date));
+        // System.println(formatTime(fromJulian(Jnoon)));
+        // // seems to be off by one day
+
+        // Angles (altitudes?) of the sun at various times of potential interest:
+        var riseAngle = -0.8333;
+        // var riseEndAngle = -0.3;
+        // var dawnAngle = -6.0;
+        // var nauticalDawnAngle = -12.0;
+        // var nightEndAngle = -18;
+        // var goldenHourEndAngle = 6;
+
+        var Jset = getSetJ(toRadians(riseAngle + dh), lw, phi, dec, n, M, L);
+        var Jrise = Jnoon - (Jset - Jnoon);
+
         return {
-            :rise => date,
-            :set => date,
+            :noon => fromJulian(Jnoon),
+            :nadir => fromJulian(Jnoon-0.5),
+            :rise => fromJulian(Jrise),
+            :set => fromJulian(Jset),
         };
     }
 }
 
 (:test)
 function testSunPosition(logger as Logger) as Boolean {
-// now: 2023-04-17 18:05:20 +0000; seconds: 1681754720.636094
-// sun: (azimuth: 0.5736154210007178, altitude: 0.9617565391201531)
-// solar noon: 4/17/2023, 12:52
-// sunrise: 4/17/2023, 06:09
-// sunset: 4/17/2023, 19:35
-// sunriseEnd: 4/17/2023, 06:12
-// sunsetStart: 4/17/2023, 19:32
-// dawn: 4/17/2023, 05:40
-// dusk: 4/17/2023, 20:04
-// nauticalDawn: 4/17/2023, 05:05
-// nauticalDusk: 4/17/2023, 20:38
-// nightEnd: 4/17/2023, 04:29
-// night: 4/17/2023, 21:15
-// goldenHourEnd: 4/17/2023, 06:46
-// goldenHour: 4/17/2023, 18:58
-// Moon:
-// position: (azimuth: 0.9277819437519993, altitude: 0.5089836452559305, distance: 369507.9094926991, parallacticAngle: 0.6464448130257752)
-// illumination: (fraction: 0.06630886962389404, phase: 0.9170995880185985, angle: 1.0574608202017584)
-// rise: 4/17/2023, 05:11; set: 4/17/2023, 17:03
+
+    // For reference, from my Swift port:
+    // now: 2023-04-17 18:05:20 +0000; seconds: 1681754720.636094
+    // sun: (azimuth: 0.5736154210007178, altitude: 0.9617565391201531)
+    // solar noon:    4/17/2023, 12:52
+    // sunrise:       4/17/2023, 06:09
+    // sunset:        4/17/2023, 19:35
+    // sunriseEnd:    4/17/2023, 06:12
+    // sunsetStart:   4/17/2023, 19:32
+    // dawn:          4/17/2023, 05:40
+    // dusk:          4/17/2023, 20:04
+    // nauticalDawn:  4/17/2023, 05:05
+    // nauticalDusk:  4/17/2023, 20:38
+    // nightEnd:      4/17/2023, 04:29
+    // night:         4/17/2023, 21:15
+    // goldenHourEnd: 4/17/2023, 06:46
+    // goldenHour:    4/17/2023, 18:58
+    // Moon:
+    // position: (azimuth: 0.9277819437519993, altitude: 0.5089836452559305, distance: 369507.9094926991, parallacticAngle: 0.6464448130257752)
+    // illumination: (fraction: 0.06630886962389404, phase: 0.9170995880185985, angle: 1.0574608202017584)
+    // rise: 4/17/2023, 05:11; set: 4/17/2023, 17:03
 
 
     var april17 = new Moment(1681754720);
@@ -207,13 +272,29 @@ function testSunTimes(logger as Logger) as Boolean {
     var hamden = new Position.Location({:latitude => 41.3460, :longitude => -72.9125, :format => :degrees});
     var midnight = Gregorian.moment({:year => 2023, :month => :april, :day => 17, :hour => 4, :minute => 0, :second => 0});
 
-    var times = Orbits.sunTimes(midnight, hamden);
+    var times = Orbits.sunTimes(midnight, hamden, 30.0);
 
-    assertEqualLog(formatTime(times.get(:rise)), "2023-04-17 06:09", logger);
-    assertEqualLog(formatTime(times.get(:set)), "2023-04-17 19:35", logger);
+    assertEqualLog(formatTime(times.get(:noon)),  "2023-04-17 12:52", logger);
+    assertEqualLog(formatTime(times.get(:nadir)), "2023-04-17 00:52", logger);
+    assertEqualLog(formatTime(times.get(:rise)),  "2023-04-17 06:09", logger);
+    assertEqualLog(formatTime(times.get(:set)),   "2023-04-17 19:35", logger);
 
-    var sunset = Gregorian.info(times.get(:set), Time.FORMAT_MEDIUM);
-    assertEqualLog(sunset.hour, 19, logger);
+    return true;
+}
+
+// Note: the test assumes it's running in EST
+(:test)
+function testSunTimes2(logger as Logger) as Boolean {
+    var guadalajara = new Position.Location({:latitude => 20.66, :longitude => -103.35, :format => :degrees});
+    var midnight = Gregorian.moment({:year => 2023, :month => :august, :day => 15, :hour => 6, :minute => 0, :second => 0});
+
+    // Note: actual elevation is 1543, but timeanddate.com seems to be ignoring that.
+    var times = Orbits.sunTimes(midnight, guadalajara, 0.0); //1543.0);
+
+    assertEqualLog(formatTime(times.get(:noon)),  "2023-08-15 14:59", logger);  // Actual: 14:57
+    assertEqualLog(formatTime(times.get(:nadir)), "2023-08-15 02:59", logger);
+    assertEqualLog(formatTime(times.get(:rise)),  "2023-08-15 08:33", logger);  // Actual: 08:32
+    assertEqualLog(formatTime(times.get(:set)),   "2023-08-15 21:24", logger);  // Actual: 21:22
 
     return true;
 }
