@@ -7,7 +7,7 @@ PATH="$PATH:$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sd
 # See https://developer.garmin.com/connect-iq/core-topics/unit-testing/
 monkeyc \
     -f monkey.jungle  \
-    -o bin/moonface.prg \
+    -o build/test/moonface.prg \
     -y "$HOME/Developer/Garmin/developer_key" \
     -d fenix7_sim \
     -w -l 2 \
@@ -15,4 +15,16 @@ monkeyc \
 
 connectiq
 
-monkeydo bin/moonface.prg fenix7 -t
+monkeydo build/test/moonface.prg fenix7 -t
+
+for device in "fenix7"; do
+    echo "Building for $device..."
+    monkeyc \
+        -f monkey.jungle  \
+        -o build/$device/moonface.prg \
+        -y "$HOME/Developer/Garmin/developer_key" \
+        -d $device \
+        --release
+
+    ls -lh build/$device/*.prg
+done
