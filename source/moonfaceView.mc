@@ -36,7 +36,16 @@ class moonfaceView extends WatchUi.WatchFace {
 
     // Update the view
     function onUpdate(dc as Dc) as Void {
+        // Local time for display:
         var clockTime = System.getClockTime();
+
+        // UTC time for astronomical calculations:
+        var now = Time.now();
+
+        // HACK:
+        var hamden = new Position.Location({:latitude => 41.3460, :longitude => -72.9125, :format => :degrees});
+        var loc = hamden;
+        var elevation = 30.0;
 
         // TODO: redraw only seconds when appropriate? Or request one update per minute?
 
@@ -45,10 +54,13 @@ class moonfaceView extends WatchUi.WatchFace {
         // System.println(width);  // to DEBUG CONSOLE view in VS Code
 
         // TEMP: these are for Hamden on 4/16
-        var sunrise = 6 + 11/60.0;
-        var sunset = 19 + 34/60.0;
+        // var sunrise = 6 + 11/60.0;
+        // var sunset = 19 + 34/60.0;
         // var sunrise = 4 + 11/60.0;
         // var sunset = 21 + 34/60.0;
+        var sunTimes = Orbits.sunTimes(now, loc, elevation);
+        var sunrise = localTimeOfDay(sunTimes.get(:rise));
+        var sunset = localTimeOfDay(sunTimes.get(:set));
 
         // moon:
         // position: (azimuth: 0.6634013271521355, altitude: 0.5159978116213177, distance: 366582.4216626519, parallacticAngle: 0.49018236895626655)
@@ -58,14 +70,17 @@ class moonfaceView extends WatchUi.WatchFace {
         // position: (azimuth: 1.7599871129151814, altitude: -0.44627517652070303, distance: 367151.127656053, parallacticAngle: 0.8440972773676563)
         // illumination: (fraction: 0.1220491397094714, phase: 0.8864006183816902, angle: 1.087339380493634)
 
-        var now = clockTime.hour + clockTime.min/60.0;
+        // var now = clockTime.hour + clockTime.min/60.0;
 
         // some bogus animation just to move it around for now:
-        var moonAzimuth = 1.75 + (now - sunset)*Math.PI/12;
-        var moonAltitude = 0.5*Math.cos(moonAzimuth).toFloat();
-        var moonParallactic = moonAzimuth - 0.15;
+        var moonPosition = Orbits.moonPosition(now, loc);
+        // var moonAzimuth = 1.75 + (now - sunset)*Math.PI/12;
+        // var moonAltitude = 0.5*Math.cos(moonAzimuth).toFloat();
+        // var moonParallactic = moonAzimuth - 0.15;
 
-        var isDay = now >= sunrise && now <= sunset;
+        var localNow = localTimeOfDay(now);
+        var isDay = localNow >= sunrise && localNow <= sunset;
+
         var faceColor = isDay ? COLOR_DAY_SKY : COLOR_NIGHT_SKY;
 
         // Relatively fixed; changes only at sunrise/set
@@ -74,17 +89,20 @@ class moonfaceView extends WatchUi.WatchFace {
         dc.setAntiAlias(true);
 
         // Draw indices, numerals, and the sun itself
-        drawSunTrack(dc, sunrise, sunset, now);
+        drawSunTrack(dc, sunrise, sunset, localNow);
 
         // Indicating direction reference for what view of the sky we're dealing with
         drawCompass(dc);
 
-        drawMoon(dc, moonAzimuth, moonAltitude, moonParallactic, 0.11);
+        drawMoon(dc, moonPosition.get(:azimuth), moonPosition.get(:altitude), moonPosition.get(:parallacticAngle), 0.11);
 
         var timeString = getLocalTimeString(clockTime);
         dc.setColor(Graphics.COLOR_WHITE, COLOR_NONE);
-        dc.drawText(width/2, height/2 + 10, Graphics.FONT_NUMBER_MILD, timeString,
-            Graphics.TEXT_JUSTIFY_CENTER);
+        var timeY = moonPosition.get(:altitude) >= 0 ? 40 : -30;  // FIXME: needs scaling for font size
+        dc.drawText(width/2, height/2 + timeY, Graphics.FONT_NUMBER_MILD, timeString,
+            Graphics.TEXT_JUSTIFY_CENTER|Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // TODO: add a single complication below the time? e.g. "Tue 18"
 
         // Note: draw *after* the view's layout is rendered
         // draw64ColorPalette(dc);
