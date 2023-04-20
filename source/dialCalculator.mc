@@ -1,5 +1,6 @@
 import Toybox.Lang;
 import Toybox.Test;
+import Toybox.Time;
 
 // Calculations to arrange the 24 hours of the day around the dial, so that:
 // - sunrise always appears at the precise left corner (270°)
@@ -85,6 +86,12 @@ class DialCalculator {
     public function y() as Number {
         return Math.round(height/2 + radius*tsin).toNumber();
     }
+}
+
+// Convert UTC time (usually sometime today) to decimal hours since midnight, local time.
+function localTimeOfDay(moment as Moment) as Float {
+    var info = Gregorian.info(moment, Time.FORMAT_SHORT);
+    return info.hour + info.min/60.0;
 }
 
 (:test)
