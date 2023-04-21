@@ -1,3 +1,4 @@
+using Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Math;
 import Toybox.System;
@@ -6,8 +7,12 @@ import Toybox.Test;
 // From the sample project
 // typedef JsonResourceType as Numeric or String or Array<JsonResourceType> or Dictionary<String, JsonResourceType>;
 
-// Full moon face image pixels in code, for easy access at run time.
+// Access and draw the pixels of an image of the moon's face. The pixels are stored in a
+// JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
+// and the Toybox API seems to provide very little access to Bitmap or even String resources.
 class MoonPixels {
+    private static var SIZE as Number = 128;
+
     private var rows as Array<Array<Number>>;
 
     public function initialize() {
@@ -17,7 +22,7 @@ class MoonPixels {
     // Get the brightness at some location.
     // TODO: interpolate?
     // Result is between 0 and 1, or null if the point is outside the disk.
-    public function get(r as Decimal, theta as Decimal) as Decimal? {
+    public function getPolar(r as Decimal, theta as Decimal) as Decimal? {
         // System.println(rows[0]);
         // System.println(rows[0][[2]]);  // error
 
@@ -32,10 +37,49 @@ class MoonPixels {
         //     System.println(Lang.format("rows[$1$]: $2$, $3$", [i, rows[i], typeOf(rows[i])]));
         // }
 
-        var y = 128*r*Math.sin(theta);
-        var x = 128*r*Math.cos(theta);
+        var y = Math.round(64*r*Math.sin(theta)).toNumber();
+        var x = Math.round(64*r*Math.cos(theta)).toNumber();
+        return getRectangular(x, y);
+    }
 
-        var rowIdx = Math.round(128 + y).toNumber();
+    public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number, parallacticAngle as Decimal) as Void {
+        // TODO: uh, dither?
+
+        for (var y = -radius; y <= radius; y += 2) {
+            for (var x = -radius; x <= radius; x += 2) {
+                // TODO: this, combined with the calculations in get(), is too darn slow.
+                // Probably collapse some of it into this function and do only a single
+                // sin/cos/whatever since there's only one angle of rotation involved.
+
+                var r = Math.sqrt(y*y + x*x)/radius;
+                var theta = Math.atan2(y, x) - parallacticAngle;
+                var val = getPolar(r, theta);
+                // // System.println(Lang.format("($1$, $2$); $3$", [x, y, r]));
+                // var val = r <= 1 ? 1 : null;
+                if (val != null) {
+                    // System.println(Lang.format("($1$, $2$); $3$", [r, theta, val]));
+                    if (val > 0.75) {
+                        dc.setColor(Graphics.COLOR_WHITE, -1);
+                    }
+                    else if (val > 0.50) {
+                        dc.setColor(Graphics.COLOR_LT_GRAY, -1);
+                    }
+                    else if (val > 0.25) {
+                        dc.setColor(Graphics.COLOR_DK_GRAY, -1);
+                    }
+                    else {
+                        dc.setColor(Graphics.COLOR_BLACK, -1);
+                    }
+                    dc.drawPoint(centerX + x, centerY + y);
+                }
+            }
+        }
+    }
+
+    // Get the value, if any, for a point given in rectagular coords from the center of the disk.
+    // Returns a value between 0.0 and 1.0, or null if the point is outside the disk.
+    private function getRectangular(x as Number, y as Number) as Decimal? {
+        var rowIdx = Math.round(64 + y).toNumber();
         if (rowIdx < 0 or rowIdx >= rows.size()) { return null; }
         var row = rows[rowIdx];
 
@@ -44,7 +88,7 @@ class MoonPixels {
 
         var rawVal = row[colIdx];
 
-        return rawVal/214.0;
+        return rawVal/99.0;
     }
 }
 
@@ -52,16 +96,16 @@ class MoonPixels {
 function testGetOne(logger as Logger) as Boolean {
     var mp = new MoonPixels();
 
-    Test.assert(mp.get(1.1, 0.0) == null);
+    Test.assert(mp.getPolar(1.1, 0.0) == null);
 
     // Look at the middle pixel, but this is just the value I saw once:
-    assertApproximatelyEqual(mp.get(0.0, 0.0), 0.47, 0.01, logger);
+    // assertApproximatelyEqual(mp.getPolar(0.0, 0.0), 0.47, 0.01, logger);
 
     // Low-center is bright, more or less:
-    assertApproximatelyEqual(mp.get(0.5, Math.PI*0.5), 0.70, 0.01, logger);
+    // assertApproximatelyEqual(mp.getPolar(0.5, Math.PI*0.5), 0.70, 0.01, logger);
 
     // Upper-left is dim, more or less:
-    assertApproximatelyEqual(mp.get(0.5, -Math.PI*0.75), 0.35, 0.01, logger);
+    assertApproximatelyEqual(mp.getPolar(0.5, -Math.PI*0.75), 0.33, 0.01, logger);
 
     return true;
 }

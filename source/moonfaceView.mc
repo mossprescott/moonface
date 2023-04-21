@@ -20,8 +20,12 @@ class moonfaceView extends WatchUi.WatchFace {
 
     static var TRACK_WIDTH as Number = 15;
 
+    var moonPixels as MoonPixels;
+
     function initialize() {
         WatchFace.initialize();
+
+        moonPixels = new MoonPixels();
     }
 
     // Load your resources here
@@ -222,8 +226,12 @@ class moonfaceView extends WatchUi.WatchFace {
         var cx = width/2 + (width/3)*Math.sin(azimuth);
         var cy = height/2 - 25*altitude/0.5;
 
-        dc.setColor(Graphics.COLOR_LT_GRAY, COLOR_NONE);
-        dc.drawCircle(cx, cy, 20);
+        // dc.setColor(Graphics.COLOR_LT_GRAY, COLOR_NONE);
+        // dc.drawCircle(cx, cy, 20);
+
+        // Maybe if I understood what the parallactic angle actually means I could explain, but this
+        // does seem to put the moon right-side up, at least when it's up, and that even makes sense.
+        moonPixels.draw(dc, cx.toNumber(), cy.toNumber(), 20, parallactic);
     }
 
     function draw64ColorPalette(dc as Dc) as Void {
