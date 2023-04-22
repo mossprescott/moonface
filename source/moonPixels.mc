@@ -1,4 +1,4 @@
-using Toybox.Graphics;
+import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Math;
 import Toybox.System;
@@ -42,38 +42,51 @@ class MoonPixels {
         return getRectangular(x, y);
     }
 
+    // TODO: illumination as fraction/angle/what?
     public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number, parallacticAngle as Decimal) as Void {
         // TODO: uh, dither?
 
-        for (var y = -radius; y <= radius; y += 2) {
-            for (var x = -radius; x <= radius; x += 2) {
-                // TODO: this, combined with the calculations in get(), is too darn slow.
-                // Probably collapse some of it into this function and do only a single
-                // sin/cos/whatever since there's only one angle of rotation involved.
+        var cos = Math.cos(-parallacticAngle);
+        var sin = Math.sin(-parallacticAngle);
+        var scale = 64.0/radius;
 
-                var r = Math.sqrt(y*y + x*x)/radius;
-                var theta = Math.atan2(y, x) - parallacticAngle;
-                var val = getPolar(r, theta);
-                // // System.println(Lang.format("($1$, $2$); $3$", [x, y, r]));
-                // var val = r <= 1 ? 1 : null;
+        for (var y = -radius; y <= radius; y += 1) {
+            for (var x = -radius; x <= radius; x += 1) {
+                var val;
+                if (y*y + x*x > radius*radius) {
+                    // Skip some calculation; the point is clearly outside the disk
+                    val = null;
+                }
+                else {
+                    var mx = (x*cos - y*sin)*scale;
+                    var my = (x*sin + y*cos)*scale;
+                    // TOD0: round/interpolate?
+                    val = getRectangular(mx.toNumber(), my.toNumber());
+                }
                 if (val != null) {
-                    // System.println(Lang.format("($1$, $2$); $3$", [r, theta, val]));
+                    var color;
                     if (val > 0.75) {
-                        dc.setColor(Graphics.COLOR_WHITE, -1);
+                        color = 0xFFFFFF;  // white
                     }
                     else if (val > 0.50) {
-                        dc.setColor(Graphics.COLOR_LT_GRAY, -1);
+                        color = 0xAAAAAA;  // light gray
                     }
                     else if (val > 0.25) {
-                        dc.setColor(Graphics.COLOR_DK_GRAY, -1);
+                        color = 0x555555;  // dark gray
                     }
                     else {
-                        dc.setColor(Graphics.COLOR_BLACK, -1);
+                        color = 0x000000;  // black
                     }
-                    dc.drawPoint(centerX + x, centerY + y);
+                    drawPoint(dc, color, centerX + x, centerY + y);
                 }
             }
         }
+    }
+
+    // Note: this is factored out mostly so the profiler can record it.
+    private function drawPoint(dc as Dc, color as ColorType, x as Number, y as Number) as Void {
+        dc.setColor(color, -1);
+        dc.drawPoint(x, y);
     }
 
     // Get the value, if any, for a point given in rectagular coords from the center of the disk.
