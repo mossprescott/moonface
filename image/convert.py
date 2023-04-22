@@ -1,6 +1,9 @@
 #! /usr/bin/env python
 
 """Convert a PNG image to raw values as a nested JSON array.
+
+The source image is from wikipedia: https://en.wikipedia.org/wiki/Moon#/media/File:FullMoon2010.jpg,
+scaled to 128x128 using Preview.app.
 """
 
 import json
