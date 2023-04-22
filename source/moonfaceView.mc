@@ -172,29 +172,37 @@ class moonfaceView extends WatchUi.WatchFace {
 
     // TODO: deal with viewer looking to the north
     function drawCompass(dc as Dc) as Void {
-        var width = dc.getWidth();
-        var height = dc.getHeight();
-        var deg45x = width/6;
-        var deg30x = width/9;
+        var EAST = -Math.PI/2;
+        var SOUTH = 0.0;
+        var WEST = Math.PI/2;
+
+        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
 
         dc.setColor(Graphics.COLOR_LT_GRAY, COLOR_NONE);
 
-        dc.fillRectangle(width/2 - 2*deg45x, height/2, 2, 3);
-        dc.drawText(width/2 - 2*deg45x, height/2 + 10, Graphics.FONT_XTINY, "E",
+        skyCalc.setPosition(EAST, 0.0);
+        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
+        dc.drawText(skyCalc.x(), skyCalc.y() + 10, Graphics.FONT_XTINY, "E",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        dc.fillRectangle(width/2 - 2*deg30x, height/2, 2, 3);
-        dc.fillRectangle(width/2 - deg30x, height/2, 2, 3);
+        skyCalc.setPosition((2*EAST + SOUTH)/3, 0.0);
+        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
+        skyCalc.setPosition((EAST + 2*SOUTH)/3, 0.0);
+        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
 
-        dc.fillRectangle(width/2, height/2, 2, 3);
-        dc.drawText(width/2, height/2 + 10, Graphics.FONT_XTINY, "S",
+        skyCalc.setPosition(SOUTH, 0.0);
+        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
+        dc.drawText(skyCalc.x(), skyCalc.y() + 10, Graphics.FONT_XTINY, "S",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        dc.fillRectangle(width/2 + deg30x, height/2, 2, 3);
-        dc.fillRectangle(width/2 + 2*deg30x, height/2, 2, 3);
+        skyCalc.setPosition((2*SOUTH + WEST)/3, 0.0);
+        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
+        skyCalc.setPosition((SOUTH + 2*WEST)/3, 0.0);
+        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
 
-        dc.fillRectangle(width/2 + 2*deg45x, height/2, 2, 3);
-        dc.drawText(width/2 + 2*deg45x, height/2 + 10, Graphics.FONT_XTINY, "W",
+        skyCalc.setPosition(WEST, 0.0);
+        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
+        dc.drawText(skyCalc.x(), skyCalc.y() + 10, Graphics.FONT_XTINY, "W",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
