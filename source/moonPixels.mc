@@ -157,13 +157,14 @@ JSON-encoded chars:
 
 
 Current (dumb) option:
-- 256x256 pixels
+- 128x128 pixels
 - simple, nested JSON arrays
-- a Number between 0 and 214 at each pixel
+- a Number between 0 and 99 at each pixel
 - trimmed to remove all the empty pixels in the corners
-- adds about 250KB to the prg (up from 78KB total)
-- the same source image dithered at compile time is about 64KB
-- above encoding in Longs might be about 120K (so, 50% less overhead)
+- source JSON is about 30K
+- adds about 65KB to the prg (78KB total)
+- that's too big to load, so removed some rows
+- for 92/128 rows: memory profiler says 52KB in memory for the nested array (655 bytes for each full row)
 
 All these decoding options sound like lot of allocation of temporary arrays and boxed values,
 but what choice are they giving me?
