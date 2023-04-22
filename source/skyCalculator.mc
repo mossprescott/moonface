@@ -1,4 +1,5 @@
 import Toybox.Lang;
+using Toybox.Math;
 import Toybox.Test;
 import Toybox.Time;
 
@@ -27,11 +28,12 @@ class SkyCalculator {
         self.height = height;
     }
 
-    // azimuth: radians with 0 at north
+    // azimuth: radians with 0 at north/south(?!)
     // altitude: radians with 0 at the horizon
     public function setPosition(azimuth as Float, altitude as Float) as Void {
         self.azimuth = azimuth;
         self.altitude = altitude;
+        System.println(Lang.format("$1$, $2$", [azimuth, altitude]));
     }
 
     public function x() as Number {
@@ -45,21 +47,24 @@ class SkyCalculator {
 
 
 (:test)
-function testNoon(logger as Logger) as Boolean {
+function testSky(logger as Logger) as Boolean {
     var calc = new SkyCalculator(260, 260);
-    calc.setRadius(1.0);
 
-    calc.setPosition(Math.PI/2);
-    assertEqualLog(calc.x(), 0, logger);
+    calc.setPosition(0.0, 0.0);
+    assertEqualLog(calc.x(), 130, logger);
     assertEqualLog(calc.y(), 130, logger);
 
-    calc.setValue(12.0);
-    assertEqualLog(calc.x(), 103, logger);
-    assertEqualLog(calc.y(), 3, logger);
+    // Due east, fairly high in the sky:
+    calc.setPosition(-Math.PI/2, Math.PI/3);
+    assertEqualLog(calc.x(), 44, logger);
+    assertEqualLog(calc.y(), 73, logger);
 
-    calc.setValue(sunset);
-    assertEqualLog(calc.x(), 260, logger);
-    assertEqualLog(calc.y(), 130, logger);
+    // Due southwest, low in the sky:
+    calc.setPosition(Math.PI/4, Math.PI/6);
+    assertEqualLog(calc.x(), 173, logger);
+    assertEqualLog(calc.y(), 101, logger);
+
+    // TODO: what about values outside (-pi/2, pi/2)?
 
     return true;
 }
