@@ -1,0 +1,65 @@
+import Toybox.Lang;
+import Toybox.Test;
+import Toybox.Time;
+
+// Calculations to show objects in the sky on the watch face.
+//
+// Dead center is due south (azimuth = pi), with east near the left edge and west near
+// the right edge.
+// - altitude = 0 maps to the vertical center of the face
+// - a "large", i.e. noon altitude is near the top of the face
+//
+// It's not yet clear what to do with negative altitudes and azimuths outside the
+// E-S-W range. Either they can continue "off-screen" or could be mapped to a
+// corresponding W-N-E range below the horizon.
+//
+// Note: this layout makes sense if the sun is in the southern sky, so that it rises
+// on your left as you look to the south.
+class SkyCalculator {
+    private var width as Number;
+    private var height as Number;
+
+    private var azimuth as Float = Math.PI;
+    private var altitude as Float = 0.0;
+
+    public function initialize(width as Number, height as Number) {
+        self.width = width;
+        self.height = height;
+    }
+
+    // azimuth: radians with 0 at north
+    // altitude: radians with 0 at the horizon
+    public function setPosition(azimuth as Float, altitude as Float) as Void {
+        self.azimuth = azimuth;
+        self.altitude = altitude;
+    }
+
+    public function x() as Number {
+        return width/2 + Math.round((width/3)*azimuth/(Math.PI/2)).toNumber();
+    }
+
+    public function y() as Number {
+        return height/2 - Math.round((height/3)*altitude/(Math.PI/2)).toNumber();
+    }
+}
+
+
+(:test)
+function testNoon(logger as Logger) as Boolean {
+    var calc = new SkyCalculator(260, 260);
+    calc.setRadius(1.0);
+
+    calc.setPosition(Math.PI/2);
+    assertEqualLog(calc.x(), 0, logger);
+    assertEqualLog(calc.y(), 130, logger);
+
+    calc.setValue(12.0);
+    assertEqualLog(calc.x(), 103, logger);
+    assertEqualLog(calc.y(), 3, logger);
+
+    calc.setValue(sunset);
+    assertEqualLog(calc.x(), 260, logger);
+    assertEqualLog(calc.y(), 130, logger);
+
+    return true;
+}

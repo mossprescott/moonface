@@ -53,34 +53,12 @@ class moonfaceView extends WatchUi.WatchFace {
 
         // TODO: redraw only seconds when appropriate? Or request one update per minute?
 
-        var width = dc.getWidth();
-        var height = dc.getHeight();
-        // System.println(width);  // to DEBUG CONSOLE view in VS Code
-
-        // TEMP: these are for Hamden on 4/16
-        // var sunrise = 6 + 11/60.0;
-        // var sunset = 19 + 34/60.0;
-        // var sunrise = 4 + 11/60.0;
-        // var sunset = 21 + 34/60.0;
         var sunTimes = Orbits.sunTimes(now, loc, elevation);
         var sunrise = localTimeOfDay(sunTimes.get(:rise));
         var sunset = localTimeOfDay(sunTimes.get(:set));
 
-        // moon:
-        // position: (azimuth: 0.6634013271521355, altitude: 0.5159978116213177, distance: 366582.4216626519, parallacticAngle: 0.49018236895626655)
-        // illumination: (fraction: 0.14108114267560906, phase: 0.877434015284898, angle: 1.0984625984857552)
-        // rise: 4/16/2023, 04:45; set: 4/16/2023, 15:48
-        // at 18:14:
-        // position: (azimuth: 1.7599871129151814, altitude: -0.44627517652070303, distance: 367151.127656053, parallacticAngle: 0.8440972773676563)
-        // illumination: (fraction: 0.1220491397094714, phase: 0.8864006183816902, angle: 1.087339380493634)
-
-        // var now = clockTime.hour + clockTime.min/60.0;
-
-        // some bogus animation just to move it around for now:
+        var sunPosition = Orbits.sunPosition(now, loc);
         var moonPosition = Orbits.moonPosition(now, loc);
-        // var moonAzimuth = 1.75 + (now - sunset)*Math.PI/12;
-        // var moonAltitude = 0.5*Math.cos(moonAzimuth).toFloat();
-        // var moonParallactic = moonAzimuth - 0.15;
 
         var localNow = localTimeOfDay(now);
         var isDay = localNow >= sunrise && localNow <= sunset;
@@ -98,7 +76,12 @@ class moonfaceView extends WatchUi.WatchFace {
         // Indicating direction reference for what view of the sky we're dealing with
         drawCompass(dc);
 
+        drawSun(dc, sunPosition.get(:azimuth), sunPosition.get(:altitude));
         drawMoon(dc, moonPosition.get(:azimuth), moonPosition.get(:altitude), moonPosition.get(:parallacticAngle), 0.11);
+
+        var width = dc.getWidth();
+        var height = dc.getHeight();
+        // System.println(width);  // to DEBUG CONSOLE view in VS Code
 
         var timeString = getLocalTimeString(clockTime);
         dc.setColor(Graphics.COLOR_WHITE, COLOR_NONE);
@@ -215,23 +198,33 @@ class moonfaceView extends WatchUi.WatchFace {
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
+    // Draw the sun in the sky in the same projection as the moon. This probably makes more sense as an
+    // alternative to drawing it rotating around the dial, but for now it helps to make the moon's
+    // appearance understandable.
+    // azimuth: radians with 0 at north
+    // altitude: radians with 0 at the horizon
+    function drawSun(dc as Dc, azimuth as Float, altitude as Float) as Void {
+        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
+        skyCalc.setPosition(azimuth, altitude);
+
+        dc.setColor(COLOR_SUN, COLOR_NONE);
+        dc.fillCircle(skyCalc.x(), skyCalc.y(), 5);
+    }
+
     // azimuth: radians with 0 at north
     // altitude: radians with 0 at the horizon
     // parallactic: radians with 0 being "normal"
     // illumination: ?
     function drawMoon(dc as Dc, azimuth as Float, altitude as Float, parallactic as Float, illumination as Float) as Void {
-        var width = dc.getWidth();
-        var height = dc.getHeight();
-
-        var cx = width/2 + (width/3)*Math.sin(azimuth);
-        var cy = height/2 - 25*altitude/0.5;
+        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
+        skyCalc.setPosition(azimuth, altitude);
 
         // dc.setColor(Graphics.COLOR_LT_GRAY, COLOR_NONE);
         // dc.drawCircle(cx, cy, 20);
 
         // Maybe if I understood what the parallactic angle actually means I could explain, but this
         // does seem to put the moon right-side up, at least when it's up, and that even makes sense.
-        moonPixels.draw(dc, cx.toNumber(), cy.toNumber(), 20, parallactic);
+        moonPixels.draw(dc, skyCalc.x(), skyCalc.y(), 30, parallactic);
     }
 
     function draw64ColorPalette(dc as Dc) as Void {
