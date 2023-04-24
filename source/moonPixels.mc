@@ -44,6 +44,8 @@ class MoonPixels {
         var sin = Math.sin(-parallacticAngle);
         var scale = 64.0/radius;
 
+        var lastColor = 0xFFFFFF;
+
         for (var y = -radius; y <= radius; y += 1) {
             for (var x = -radius; x <= radius; x += 1) {
                 var val;
@@ -57,7 +59,7 @@ class MoonPixels {
                     var mx = (x*cos - y*sin)*scale;
                     var my = (x*sin + y*cos)*scale;
                     // TOD0: round/interpolate?
-                    val = getRectangular(mx.toNumber(), my.toNumber());
+                    val = getRectangular(mx.toNumber(), my.toNumber());  // 16ms
                 }
                 if (val != null) {
                     var color;
@@ -73,46 +75,59 @@ class MoonPixels {
                     else {
                         color = 0x000000;  // black
                     }
-                    drawPoint(dc, color, centerX + x, centerY + y);
+                    // Note: setColor takes ~10% of the time, so avoid it when it's redundant:
+                    if (color != lastColor) {
+                        dc.setColor(color, -1);  // 4ms
+                        lastColor = color;
+                    }
+                    dc.drawPoint(centerX + x, centerY + y);      // 7ms
                 }
             }
         }
     }
 
-    // Note: this is factored out mostly so the profiler can record it.
-    private function drawPoint(dc as Dc, color as ColorType, x as Number, y as Number) as Void {
-        dc.setColor(color, -1);
-        dc.drawPoint(x, y);
-    }
-
     // Get the value, if any, for a point given in rectagular coords from the center of the disk.
     // Returns a value between 0.0 and 1.0, or null if the point is outside the disk.
-    private function getRectangular(x as Number, y as Number) as Decimal? {
-        var rowIdx = (SIZE/2 + y).toNumber();
-        var colIdx = (SIZE/2 + x).toNumber();
-        if (rowIdx < 0 or rowIdx >= SIZE or colIdx < 0 or colIdx >= SIZE) {
+    private function getRectangular(x as Number, y as Number) as Float? {
+        // Note: as near as I can tell, local variables don't cost anything at runtime, but
+        // accessing any member or static variable does, adding up to about 15% of the time
+        // for drawing. Meanwhile, Monkey C doesn't seem to have #define or any other compile-time
+        // constants.
+        // So all the constants are re-defined here as locals:
+
+        var local_SIZE = 128;
+        var local_HALF_SIZE = 64;
+        var local_PIXELS_PER_WORD = 5;
+        var local_BITS_PER_PIXEL = 6;
+        var local_PIXEL_MASK = 0x3f;   // (1 << BITS_PER_PIXEL) - 1;
+        var local_WORDS_PER_ROW = 26;  // (128 + 5-1)/5;
+        var local_MAX_VALUE = 63.0;    // PIXEL_MASK.toFloat();
+
+        // Uncomment to verify integrity:
+        // Test.assertEqual(local_SIZE,            SIZE);
+        // Test.assertEqual(local_PIXELS_PER_WORD, PIXELS_PER_WORD);
+        // Test.assertEqual(local_BITS_PER_PIXEL,  BITS_PER_PIXEL);
+        // Test.assertEqual(local_PIXEL_MASK,      PIXEL_MASK);
+        // Test.assertEqual(local_WORDS_PER_ROW,   WORDS_PER_ROW);
+        // Test.assertEqual(local_MAX_VALUE,       MAX_VALUE);
+
+        var rowIdx = local_HALF_SIZE + y;
+        var colIdx = local_HALF_SIZE + x;
+
+        // Not: ideally not needed given the check on radius in the caller, and actually costs ~25% of the time!?
+        if (rowIdx < 0 or rowIdx >= local_SIZE or colIdx < 0 or colIdx >= local_SIZE) {
             return null;
         }
-        // System.println(Lang.format("$1$; $2$", [rowIdx, colIdx]));
 
-        var wordIdx = (colIdx / PIXELS_PER_WORD).toNumber();
-        var offset = (colIdx % PIXELS_PER_WORD)*BITS_PER_PIXEL;
-        // System.println(Lang.format("$1$; $2$", [wordIdx, offset]));
+        var wordIdx = (colIdx / local_PIXELS_PER_WORD).toNumber();
+        var offset = (colIdx % local_PIXELS_PER_WORD)*local_BITS_PER_PIXEL;
 
-        var foo = rowIdx*WORDS_PER_ROW + wordIdx;
-        // System.println(Lang.format("$1$; $2$", [foo, pixelData.size()]));
-
-        // return 0.5;
-        // System.println(Lang.format("$1$", [pixelData[foo]]));
-
-        // // System.println(pixelData);
-
-        var raw = (pixelData[foo] >> offset) & PIXEL_MASK;
+        var raw = (pixelData[rowIdx*local_WORDS_PER_ROW + wordIdx] >> offset) & local_PIXEL_MASK;
         if (raw == 0) {
             return null;
         }
         else {
-            return raw / MAX_VALUE;
+            return raw / local_MAX_VALUE;
         }
     }
 }
