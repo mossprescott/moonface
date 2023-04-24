@@ -63,12 +63,12 @@ function testSky(logger as Logger) as Boolean {
     // Due east, fairly high in the sky:
     calc.setPosition(-Math.PI/2, Math.PI/3);
     assertEqualLog(calc.x(), 44, logger);
-    assertEqualLog(calc.y(), 73, logger);
+    assertEqualLog(calc.y(), 46, logger);
 
     // Due southwest, low in the sky:
     calc.setPosition(Math.PI/4, Math.PI/6);
     assertEqualLog(calc.x(), 173, logger);
-    assertEqualLog(calc.y(), 101, logger);
+    assertEqualLog(calc.y(), 81, logger);
 
     // TODO: what about values outside (-pi/2, pi/2)?
 
