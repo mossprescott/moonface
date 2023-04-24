@@ -52,6 +52,7 @@ for device in "fenix7"; do
         -o build/$device/moonface.prg \
         -y "$HOME/Developer/Garmin/developer_key" \
         -d $device \
+        -O 2 \
         --release
 
     ls -lh build/$device/*.prg
