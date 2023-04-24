@@ -4,6 +4,14 @@ import Toybox.Math;
 import Toybox.System;
 import Toybox.Test;
 
+const SIZE as Number = 128;
+const BITS_PER_PIXEL as Number = 6;
+const PIXELS_PER_WORD as Number = 5;
+
+const WORDS_PER_ROW as Number = (SIZE + PIXELS_PER_WORD-1)/PIXELS_PER_WORD;
+const PIXEL_MASK as Number = (1 << BITS_PER_PIXEL) - 1;
+const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
+
 // From the sample project
 // typedef JsonResourceType as Numeric or String or Array<JsonResourceType> or Dictionary<String, JsonResourceType>;
 
@@ -11,14 +19,6 @@ import Toybox.Test;
 // JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
 // and the Toybox API seems to provide very little access to Bitmap or even String resources.
 class MoonPixels {
-    private static var SIZE as Number = 128;
-    private static var BITS_PER_PIXEL as Number = 6;
-    private static var PIXELS_PER_WORD as Number = 5;
-
-    private static var WORDS_PER_ROW as Number = (SIZE + PIXELS_PER_WORD-1)/PIXELS_PER_WORD;
-    private static var PIXEL_MASK as Number = (1 << BITS_PER_PIXEL) - 1;
-    private static var MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
-
     private var pixelData as Array<Number>;
 
     public function initialize() {
@@ -96,6 +96,8 @@ class MoonPixels {
         // accessing any member or static variable does, adding up to about 15% of the time
         // for drawing. Meanwhile, Monkey C doesn't seem to have #define or any other compile-time
         // constants.
+        // Correction: there is `const` as an alternative to `var`, but it's not clear that it
+        // has better performance, or even that it can handle these definitions.
         // So all the constants are re-defined here as locals:
 
         var local_SIZE = 128;
