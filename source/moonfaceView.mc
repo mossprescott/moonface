@@ -235,7 +235,7 @@ class moonfaceView extends WatchUi.WatchFace {
 
         // Maybe if I understood what the parallactic angle actually means I could explain, but this
         // does seem to put the moon right-side up, at least when it's up, if that even makes sense.
-        moonPixels.draw(dc, skyCalc.x(), skyCalc.y(), 15, parallactic);
+        moonPixels.draw(dc, skyCalc.x(), skyCalc.y(), 20, parallactic);
     }
 
     function draw64ColorPalette(dc as Dc) as Void {

@@ -38,7 +38,7 @@ class MoonPixels {
     public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number, parallacticAngle as Decimal) as Void {
         // TODO: uh, dither?
 
-        // System.println(Lang.format("angle: $1$", [parallacticAngle]));
+        var HALF_OPAQUE = true;
 
         var cos = Math.cos(-parallacticAngle);
         var sin = Math.sin(-parallacticAngle);
@@ -49,9 +49,12 @@ class MoonPixels {
         for (var y = -radius; y <= radius; y += 1) {
             for (var x = -radius; x <= radius; x += 1) {
                 var val;
-                if (y*y + x*x > radius*radius) {
+                if (HALF_OPAQUE and (y+x)%2 == 0) {
+                    continue;
+                }
+                else if (y*y + x*x > radius*radius) {
                     // Skip some calculation; the point is clearly outside the disk
-                    val = null;
+                    continue;
                 }
                 else {
                     // Note: could save some multiplication by computing dx and dy once at
