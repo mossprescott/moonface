@@ -1,15 +1,17 @@
 import Toybox.Application;
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.Position;
 import Toybox.System;
+import Toybox.Time;
 import Toybox.WatchUi;
 
 class moonfaceView extends WatchUi.WatchFace {
     static var showSeconds as Boolean = false;
 
-    static var COLOR_DAY_SKY as ColorType = 0x0055FF;
+    static var COLOR_DAY_SKY as ColorType = 0x0055AA;
     static var COLOR_NIGHT_SKY as ColorType = 0x000000;
-    static var COLOR_UNDERWORLD as ColorType = 0x555555;
+    static var COLOR_UNDERWORLD as ColorType = 0x550055;
 
     static var COLOR_DAY_FG as ColorType = 0x000000;
     static var COLOR_NIGHT_FG as ColorType = 0xFFFFFF;
@@ -63,6 +65,8 @@ class moonfaceView extends WatchUi.WatchFace {
         var localNow = localTimeOfDay(now);
         var isDay = localNow >= sunrise && localNow <= sunset;
 
+        var indexColor = isDay ? Graphics.COLOR_BLACK : Graphics.COLOR_LT_GRAY;
+
         var faceColor = isDay ? COLOR_DAY_SKY : COLOR_NIGHT_SKY;
 
         // Relatively fixed; changes only at sunrise/set
@@ -72,9 +76,10 @@ class moonfaceView extends WatchUi.WatchFace {
 
         // Draw indices, numerals, and the sun itself
         drawSunTrack(dc, sunrise, sunset, localNow);
-
         // Indicating direction reference for what view of the sky we're dealing with
         drawCompass(dc);
+
+        drawSunTrackOffDial(dc, loc, Time.today(), indexColor);
 
         drawSun(dc, sunPosition.get(:azimuth), sunPosition.get(:altitude));
 
@@ -152,25 +157,45 @@ class moonfaceView extends WatchUi.WatchFace {
             dc.setColor(isDay ? Graphics.COLOR_BLACK : Graphics.COLOR_LT_GRAY, COLOR_NONE);
 
             if (h % 2 == 0) {
-                calc.setRadius(0.85);
-                dc.drawText(calc.x(), calc.y(), Graphics.FONT_GLANCE, Lang.format("$1$", [h]),
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                calc.setRadius(0.90);
+                if (calc.y() <= height/2 + 10) {
+                    dc.drawText(calc.x(), calc.y(), Graphics.FONT_GLANCE, Lang.format("$1$", [h]),
+                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                }
             }
 
-            calc.setRadius(0.95);
-            dc.fillCircle(calc.x(), calc.y(), 1.5);
+            // TEMP:
+            // calc.setRadius(0.95);
+            // dc.fillCircle(calc.x(), calc.y(), 1.5);
         }
 
-        calc.setValue(current);
-        calc.setRadius(1.0);
-        var r = width/15;  // puts the
-        dc.setColor(COLOR_SUN, COLOR_NONE);
-        dc.drawCircle(calc.x(), calc.y(), r);
-       // if (calc.isDay()) {
-        dc.setClip(0, 0, width, height/2);
-            dc.fillCircle(calc.x(), calc.y(), r);
-        dc.clearClip();
+        // TEMP: don't draw the sun at the edge of the dial for now. Maybe replace it with some
+        // other indicator later?
+    //     calc.setValue(current);
+    //     calc.setRadius(1.0);
+    //     var r = width/15;  // puts the
+    //     dc.setColor(COLOR_SUN, COLOR_NONE);
+    //     dc.drawCircle(calc.x(), calc.y(), r);
+    //    // if (calc.isDay()) {
+    //     dc.setClip(0, 0, width, height/2);
+    //         dc.fillCircle(calc.x(), calc.y(), r);
+    //     dc.clearClip();
        // }
+    }
+
+    // Draw an index at the location of the sun at each hour of the day.
+    function drawSunTrackOffDial(dc as Dc, loc as Position.Location, midnight as Moment, indexColor as ColorType) as Void {
+        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
+
+        dc.setColor(indexColor, COLOR_NONE);
+
+        for (var h = 0; h < 24; h += 1) {
+            var t = midnight.add(new Duration(h*60*60));
+            var pos = Orbits.sunPosition(t, loc);
+            skyCalc.setPosition(pos.get(:azimuth), pos.get(:altitude));
+            var r = h % 2 == 0 ? 2.0 : 1.0;
+            dc.fillCircle(skyCalc.x(), skyCalc.y(), r);
+        }
     }
 
     // TODO: deal with viewer looking to the north
