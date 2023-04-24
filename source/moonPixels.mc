@@ -12,8 +12,10 @@ const WORDS_PER_ROW as Number = (SIZE + PIXELS_PER_WORD-1)/PIXELS_PER_WORD;
 const PIXEL_MASK as Number = (1 << BITS_PER_PIXEL) - 1;
 const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 
-// From the sample project
-// typedef JsonResourceType as Numeric or String or Array<JsonResourceType> or Dictionary<String, JsonResourceType>;
+// A limit on the total amount of points to ever draw in a single cycle, to avoid
+// running into the execution time limit. No way to come up with a precise figure,
+// this is the result of a little trial and error.
+const MAX_PLOTTED as Number = 1000;
 
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
 // JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
@@ -38,13 +40,14 @@ class MoonPixels {
     public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number, parallacticAngle as Decimal) as Void {
         // TODO: uh, dither?
 
-        var HALF_OPAQUE = true;
+        var HALF_OPAQUE = false;
 
         var cos = Math.cos(-parallacticAngle);
         var sin = Math.sin(-parallacticAngle);
         var scale = 64.0/radius;
 
         var lastColor = 0xFFFFFF;
+        var plottedCount = 0;
 
         for (var y = -radius; y <= radius; y += 1) {
             for (var x = -radius; x <= radius; x += 1) {
@@ -84,9 +87,21 @@ class MoonPixels {
                         lastColor = color;
                     }
                     dc.drawPoint(centerX + x, centerY + y);      // 7ms
+                    plottedCount += 1;
+
+                    if (plottedCount >= MAX_PLOTTED) {
+                        System.println(Lang.format("Aborting drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
+                        return;
+                    }
+                    else if (!HALF_OPAQUE and plottedCount > MAX_PLOTTED*0.60) {
+                        System.println(Lang.format("Switching to 50% drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
+                        HALF_OPAQUE = true;
+                    }
                 }
             }
         }
+
+        System.println(Lang.format("plotted: $1$", [plottedCount]));
     }
 
     // Get the value, if any, for a point given in rectagular coords from the center of the disk.
