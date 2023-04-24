@@ -17,6 +17,10 @@ import Toybox.Time;
 // Note: this layout makes sense if the sun is in the southern sky, so that it rises
 // on your left as you look to the south.
 class SkyCalculator {
+    // 1.0 would put the sun/moon, when directly overhead, at the exact top edge at the center
+    // of the face.
+    private var MAX_HEIGHT as Float = 0.75;
+
     private var width as Number;
     private var height as Number;
 
@@ -33,7 +37,7 @@ class SkyCalculator {
     public function setPosition(azimuth as Float, altitude as Float) as Void {
         self.azimuth = azimuth;
         self.altitude = altitude;
-        System.println(Lang.format("$1$, $2$", [azimuth, altitude]));
+        // System.println(Lang.format("$1$, $2$", [azimuth, altitude]));
     }
 
     public function x() as Number {
@@ -41,7 +45,9 @@ class SkyCalculator {
     }
 
     public function y() as Number {
-        return height/2 - Math.round((height/3)*altitude/(Math.PI/2)).toNumber();
+        // var fraction = altitude/(Math.PI/2);
+        var fraction = Math.sin(altitude);
+        return height/2 - Math.round((height/2)*MAX_HEIGHT*fraction).toNumber();
     }
 }
 
