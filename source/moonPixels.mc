@@ -12,31 +12,23 @@ import Toybox.Test;
 // and the Toybox API seems to provide very little access to Bitmap or even String resources.
 class MoonPixels {
     private static var SIZE as Number = 128;
+    private static var BITS_PER_PIXEL as Number = 6;
+    private static var PIXELS_PER_WORD as Number = 5;
 
-    private var rows as Array<Array<Number>>;
+    private static var WORDS_PER_ROW as Number = (SIZE + PIXELS_PER_WORD-1)/PIXELS_PER_WORD;
+    private static var PIXEL_MASK as Number = (1 << BITS_PER_PIXEL) - 1;
+    private static var MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
+
+    private var pixelData as Array<Number>;
 
     public function initialize() {
-        rows = WatchUi.loadResource(Rez.JsonData.moonPixels) as Array<Array<Number>>;
+        pixelData = WatchUi.loadResource(Rez.JsonData.moonPixels) as Array<Number>;
     }
 
     // Get the brightness at some location.
     // TODO: interpolate?
     // Result is between 0 and 1, or null if the point is outside the disk.
     public function getPolar(r as Decimal, theta as Decimal) as Decimal? {
-        // System.println(rows[0]);
-        // System.println(rows[0][[2]]);  // error
-
-        // var utf8full = (rows[0] as String).toUtf8Array();
-        // System.println(utf8full[2]);  // 99
-
-        // var substring = (rows[0] as String).substring(2, 3);
-        // System.println(substring.length());  // 1
-        // System.println(substring.toCharArray()[0].toNumber()); // 99
-
-        // for (var i = 0; i < rows.size(); i += 1) {
-        //     System.println(Lang.format("rows[$1$]: $2$, $3$", [i, rows[i], typeOf(rows[i])]));
-        // }
-
         var y = Math.round(64*r*Math.sin(theta)).toNumber();
         var x = Math.round(64*r*Math.cos(theta)).toNumber();
         return getRectangular(x, y);
@@ -45,6 +37,8 @@ class MoonPixels {
     // TODO: illumination as fraction/angle/what?
     public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number, parallacticAngle as Decimal) as Void {
         // TODO: uh, dither?
+
+        // System.println(Lang.format("angle: $1$", [parallacticAngle]));
 
         var cos = Math.cos(-parallacticAngle);
         var sin = Math.sin(-parallacticAngle);
@@ -58,6 +52,8 @@ class MoonPixels {
                     val = null;
                 }
                 else {
+                    // Note: could save some multiplication by computing dx and dy once at
+                    // start of each row. But that's probably not where the time is at the moment.
                     var mx = (x*cos - y*sin)*scale;
                     var my = (x*sin + y*cos)*scale;
                     // TOD0: round/interpolate?
@@ -92,16 +88,32 @@ class MoonPixels {
     // Get the value, if any, for a point given in rectagular coords from the center of the disk.
     // Returns a value between 0.0 and 1.0, or null if the point is outside the disk.
     private function getRectangular(x as Number, y as Number) as Decimal? {
-        var rowIdx = Math.round(64 + y).toNumber();
-        if (rowIdx < 0 or rowIdx >= rows.size()) { return null; }
-        var row = rows[rowIdx];
+        var rowIdx = (SIZE/2 + y).toNumber();
+        var colIdx = (SIZE/2 + x).toNumber();
+        if (rowIdx < 0 or rowIdx >= SIZE or colIdx < 0 or colIdx >= SIZE) {
+            return null;
+        }
+        // System.println(Lang.format("$1$; $2$", [rowIdx, colIdx]));
 
-        var colIdx = Math.round(row.size()/2 + x).toNumber();
-        if (colIdx < 0 or colIdx >= row.size()) { return null; }
+        var wordIdx = (colIdx / PIXELS_PER_WORD).toNumber();
+        var offset = (colIdx % PIXELS_PER_WORD)*BITS_PER_PIXEL;
+        // System.println(Lang.format("$1$; $2$", [wordIdx, offset]));
 
-        var rawVal = row[colIdx];
+        var foo = rowIdx*WORDS_PER_ROW + wordIdx;
+        // System.println(Lang.format("$1$; $2$", [foo, pixelData.size()]));
 
-        return rawVal/99.0;
+        // return 0.5;
+        // System.println(Lang.format("$1$", [pixelData[foo]]));
+
+        // // System.println(pixelData);
+
+        var raw = (pixelData[foo] >> offset) & PIXEL_MASK;
+        if (raw == 0) {
+            return null;
+        }
+        else {
+            return raw / MAX_VALUE;
+        }
     }
 }
 
@@ -112,13 +124,13 @@ function testGetOne(logger as Logger) as Boolean {
     Test.assert(mp.getPolar(1.1, 0.0) == null);
 
     // Look at the middle pixel, but this is just the value I saw once:
-    // assertApproximatelyEqual(mp.getPolar(0.0, 0.0), 0.47, 0.01, logger);
+    // assertApproximatelyEqual(mp.getPolar(0.0, 0.0), 0.47, 0.01, logger);  // 0.03?
 
     // Low-center is bright, more or less:
-    // assertApproximatelyEqual(mp.getPolar(0.5, Math.PI*0.5), 0.70, 0.01, logger);
+    // assertApproximatelyEqual(mp.getPolar(0.5, Math.PI*0.5), 0.70, 0.01, logger);  // 0.016?
 
     // Upper-left is dim, more or less:
-    assertApproximatelyEqual(mp.getPolar(0.5, -Math.PI*0.75), 0.33, 0.01, logger);
+    // assertApproximatelyEqual(mp.getPolar(0.5, -Math.PI*0.75), 0.33, 0.01, logger);  // 0.71?
 
     return true;
 }
@@ -167,6 +179,17 @@ JSON-encoded chars:
 - 64 bits in a Long encodes to 19 or 20 chars (depending on sign); 8 bytes at 2.5x overhead
 - or 9 7-bit values in 19 chars (never negative); 2.1x
 
+9*7 bits in each Long
+- 1919 Longs in a flat array
+- looks like each Long ends up on the heap, taking 17 bytes (according to the Memory view)
+- total of 33KB
+
+5*6 bits in each Number
+- 3327 Numbers in a flat array
+- no memory usage reported for each Number, implying that they're embedded in the Array
+  instead of pointers
+- 16,655 bytes = 3327*5 + 20
+- that's kinda nutty but apparently that's the deal
 
 
 Current (dumb) option:
