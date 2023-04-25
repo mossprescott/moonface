@@ -15,7 +15,7 @@ const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 // A limit on the total amount of points to ever draw in a single cycle, to avoid
 // running into the execution time limit. No way to come up with a precise figure,
 // this is the result of a little trial and error.
-const MAX_PLOTTED as Number = 1000;
+const MAX_PLOTTED as Number = 700;
 
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
 // JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
@@ -36,15 +36,39 @@ class MoonPixels {
         return getRectangular(x, y);
     }
 
-    // TODO: illumination as fraction/angle/what?
-    public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number, parallacticAngle as Decimal) as Void {
+    public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number,
+                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
         // TODO: uh, dither?
 
         var HALF_OPAQUE = false;
 
         var cos = Math.cos(-parallacticAngle);
         var sin = Math.sin(-parallacticAngle);
-        var scale = 64.0/radius;
+        var scale = (SIZE/2)/radius;
+        var rsq = radius*radius;
+
+        // Half the minor axis of an ellipse defining the edge of the illuminated part of the moon.
+        // Note: I suspect an ellipse isn't actually quite the correct shape, but at this resolution
+        // it's probably close enough.
+        var a;
+        if (illuminationFraction < 0.5) {
+            // Just trying the get this approximately realistic:
+            // - some sliver of the moon visible except within ~24 hours of the new moon.
+            a = (SIZE/2 - 4)*(1 - 2*illuminationFraction);
+            // System.println(Lang.format("a: $1$", [a]));
+        } else {
+            a = (SIZE/2 - 4)*(2*illuminationFraction - 1);
+            // System.println(Lang.format("(-)a: $1$", [a]));
+        }
+        var drawRight = phase <= 0.5;
+        var drawCenter = 0.25 < phase and phase < 0.75;  // ?
+        var drawLeft = phase >= 0.5;
+        // System.println(Lang.format("$1$; $2$; $3$", [drawLeft, drawCenter, drawRight]));
+
+        var b = SIZE/2;
+        var asq = a*a;
+        var bsq = b*b;
+        var absq = asq*bsq;
 
         var lastColor = 0xFFFFFF;
         var plottedCount = 0;
@@ -52,21 +76,29 @@ class MoonPixels {
         for (var y = -radius; y <= radius; y += 1) {
             for (var x = -radius; x <= radius; x += 1) {
                 var val;
-                if (HALF_OPAQUE and (y+x)%2 == 0) {
+                if (HALF_OPAQUE and (y+x)&1 == 0) {
                     continue;
                 }
-                else if (y*y + x*x > radius*radius) {
+                else if (y*y + x*x > rsq) {
                     // Skip some calculation; the point is clearly outside the disk
                     continue;
                 }
-                else {
-                    // Note: could save some multiplication by computing dx and dy once at
-                    // start of each row. But that's probably not where the time is at the moment.
-                    var mx = (x*cos - y*sin)*scale;
-                    var my = (x*sin + y*cos)*scale;
-                    // TOD0: round/interpolate?
-                    val = getRectangular(mx.toNumber(), my.toNumber());  // 16ms
+
+                // Note: could save some multiplication by computing dx and dy once at
+                // start of each row. But that's probably not where the time is at the moment.
+                var mx = (x*cos - y*sin)*scale;
+                var my = (x*sin + y*cos)*scale;
+
+                // Is this pixel towards the center of the moon's image, relative to the ellipse
+                // that defines the edge of the illuminated area?
+                var inside = bsq*mx*mx + asq*my*my < absq;
+                if (inside) {
+                    if (!drawCenter) { continue; }
                 }
+                else if ((mx < 0 and !drawLeft) or (mx > 0 and !drawRight)) { continue; }
+
+                // TOD0: round/interpolate?
+                val = getRectangular(mx.toNumber(), my.toNumber());  // 16ms
                 if (val != null) {
                     var color;
                     if (val > 0.75) {
@@ -101,7 +133,7 @@ class MoonPixels {
             }
         }
 
-        System.println(Lang.format("plotted: $1$", [plottedCount]));
+        //System.println(Lang.format("plotted: $1$", [plottedCount]));
     }
 
     // Get the value, if any, for a point given in rectagular coords from the center of the disk.

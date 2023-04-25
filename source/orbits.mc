@@ -38,7 +38,7 @@ class Orbits {
     // Date/time constants and conversions in weird astronomical units:
     //
 
-    private static var daySecs as Number = 60*60*24;
+    private static const daySecs as Number = 60*60*24;
     private static var julian1970 as Number = 2440588;
     private static var julian2000 as Number = 2451545;
 
@@ -271,29 +271,39 @@ class Orbits {
     }
 
 
-    // /// calculations for illumination parameters of the moon,
-    // /// based on http://idlastro.gsfc.nasa.gov/ftp/pro/astro/mphase.pro formulas and
-    // /// Chapter 48 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
-    // /// Note: these parameters are independent of viewing location. We all see the same moon!
-    // public static func getIllumination(_ date: Date) -> (fraction: Double, phase: Double, angle: Double) {
+    // calculations for illumination parameters of the moon,
+    // based on http://idlastro.gsfc.nasa.gov/ftp/pro/astro/mphase.pro formulas and
+    // Chapter 48 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
+    // Note: these parameters are independent of viewing location. We all see the same moon!
+    //
+    // :fraction
+    // :phase
+    // :angle
+    public static function moonIllumination(date as Moment) as Dictionary<Symbol, Decimal> {
+        var d = toDays(date);
+        var s = erase(sunCoords(d));
+        var m = erase(moonCoords(d));
 
-    //     let d = toDays(date)
-    //     let s = sunCoords(d)
-    //     let m = coords(d)
+        var sdist = 149598000.0; // distance from Earth to Sun in km
 
-    //     let sdist = 149598000.0 // distance from Earth to Sun in km
+        var sdec = s.get(:dec);
+        var sra = s.get(:ra);
+        var mdec = m.get(:dec);
+        var mra = m.get(:ra);
+        var mdist = m.get(:dist);
 
-    //     let phi = acos(sin(s.dec) * sin(m.dec) + cos(s.dec) * cos(m.dec) * cos(s.ra - m.ra))
-    //     let inc = atan2(sdist * sin(phi), m.dist - sdist * cos(phi))
-    //     let angle = atan2(cos(s.dec) * sin(s.ra - m.ra), sin(s.dec) * cos(m.dec) -
-    //                 cos(s.dec) * sin(m.dec) * cos(s.ra - m.ra))
+        var phi = acos(sin(sdec)*sin(mdec) + cos(sdec)*cos(mdec)*cos(sra - mra));
+        var inc = atan2(sdist * sin(phi),
+                        mdist - sdist*cos(phi));
+        var angle = atan2(cos(sdec)*sin(sra - mra),
+                          sin(sdec)*cos(mdec) - cos(sdec)*sin(mdec)*cos(sra - mra));
 
-    //     return (
-    //         fraction: (1 + cos(inc)) / 2,
-    //         phase: 0.5 + 0.5 * inc * (angle < 0 ? -1 : 1) / pi,
-    //         angle: angle
-    //     )
-    // }
+        return {
+            :fraction => (1 + cos(inc)) / 2,
+            :phase => 0.5 + 0.5*inc*(angle < 0 ? -1 : 1)/Math.PI,
+            :angle => angle,
+        };
+    }
 
 
     // public enum RiseAndSet {
@@ -450,6 +460,18 @@ function testMoonPosition(logger as Logger) as Boolean {
     assertApproximatelyEqual(pos.get(:altitude),         0.5089, 0.01, logger);
     assertApproximatelyEqual(pos.get(:distance),      369507.90,  1.0, logger);
     assertApproximatelyEqual(pos.get(:parallacticAngle), 0.6464, 0.01, logger);
+
+    return true;
+}
+
+(:test)
+function testMoonIllumination(logger as Logger) as Boolean {
+    var april17 = new Moment(1681754720);
+
+    var pos = Orbits.moonIllumination(april17);
+    assertApproximatelyEqual(pos.get(:fraction), 0.06630, 0.0001, logger);
+    assertApproximatelyEqual(pos.get(:phase),    0.9171,  0.0001, logger);
+    assertApproximatelyEqual(pos.get(:angle),    1.057,   0.001, logger);
 
     return true;
 }
