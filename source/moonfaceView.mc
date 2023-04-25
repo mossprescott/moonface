@@ -21,7 +21,7 @@ const TRACK_WIDTH as Number = 15;
 
 
 class moonfaceView extends WatchUi.WatchFace {
-    static var showSeconds as Boolean = true;
+    static var showSeconds as Boolean = false;
 
     var moonPixels as MoonPixels;
 
@@ -43,6 +43,7 @@ class moonfaceView extends WatchUi.WatchFace {
     // the state of this View and prepare it to be shown. This includes
     // loading resources into memory.
     function onShow() as Void {
+        showSeconds = Properties.getValue("ShowSeconds");
     }
 
     // Update the view
@@ -60,13 +61,12 @@ class moonfaceView extends WatchUi.WatchFace {
     // The user has just looked at their watch.
     function onExitSleep() as Void {
         System.println("low power mode: off");
-        // showSeconds = true;
     }
 
     // Terminate any active timers and prepare for slow updates.
     function onEnterSleep() as Void {
         System.println("low power mode: on");
-        // showSeconds = false;
+        showSeconds = false;
     }
 
     // Update only the seconds, and only if enabled in settings.

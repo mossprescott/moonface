@@ -2,6 +2,8 @@
 
     <string id="AppName">Garmoon</string>
 
+    <string id="ShowSecondsTitle">Show Seconds</string>
+
     <!-- <string id="BackgroundColorTitle">Background Color</string>
     <string id="ForegroundColorTitle">Foreground Color</string>
     <string id="MilitaryFormatTitle">Military Format for 24 Hour Time</string>
