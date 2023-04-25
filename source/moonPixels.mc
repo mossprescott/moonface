@@ -36,6 +36,15 @@ class MoonPixels {
         return getRectangular(x, y);
     }
 
+    // // Get the brightness at some location.
+    // // TODO: interpolate?
+    // // Result is between 0 and 1, or null if the point is outside the disk.
+    // public function getPolar(r as Decimal, theta as Decimal) as Decimal? {
+    //     var y = Math.round((SIZE/2)*r*Math.sin(theta)).toNumber();
+    //     var x = Math.round((SIZE/2)*r*Math.cos(theta)).toNumber();
+    //     return getRectangular(x, y);
+    // }
+
     public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number,
                          parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
         // TODO: uh, dither?
