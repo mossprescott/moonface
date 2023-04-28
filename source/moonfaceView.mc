@@ -49,14 +49,20 @@ class moonfaceView extends WatchUi.WatchFace {
     // Update the view
     function onUpdate(dc as Dc) as Void {
         System.println("onUpdate()");
+        var start = System.getTimer();
         drawAll(dc, false);
+        var end = System.getTimer();
+
+        dc.setColor(Graphics.COLOR_WHITE, -1);
+        dc.drawText(dc.getWidth()/2, dc.getHeight()-10, Graphics.FONT_XTINY,
+            Lang.format("$1$ms", [end - start]),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     // Called when this View is removed from the screen. Save the
     // state of this View here. This includes freeing resources from
     // memory.
-    function onHide() as Void {
-    }
+    function onHide() as Void {    }
 
     // The user has just looked at their watch.
     function onExitSleep() as Void {
