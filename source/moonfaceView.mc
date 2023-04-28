@@ -19,11 +19,13 @@ const COLOR_NONE as ColorType = -1;
 
 const TRACK_WIDTH as Number = 15;
 
+const MOON_RADIUS = 20;
+
 
 class moonfaceView extends WatchUi.WatchFace {
     static var showSeconds as Boolean = false;
 
-    var moonPixels as MoonPixels;
+    var moonBuffer as MoonBuffer;
 
     // Cache some state between draw calls:
     var isMoonUp as Boolean = true;
@@ -32,7 +34,7 @@ class moonfaceView extends WatchUi.WatchFace {
     function initialize() {
         WatchFace.initialize();
 
-        moonPixels = new MoonPixels();
+        moonBuffer = new MoonBuffer(MOON_RADIUS);
     }
 
     // Load your resources here
@@ -49,8 +51,7 @@ class moonfaceView extends WatchUi.WatchFace {
     // Update the view
     function onUpdate(dc as Dc) as Void {
         System.println("onUpdate()");
-        var start = System.getTimer();
-        drawAll(dc, false);
+        var start = System.getTimer();        drawAll(dc, false);
         var end = System.getTimer();
 
         dc.setColor(Graphics.COLOR_WHITE, -1);
@@ -303,16 +304,13 @@ class moonfaceView extends WatchUi.WatchFace {
         // dc.setColor(Graphics.COLOR_LT_GRAY, COLOR_NONE);
         // dc.drawCircle(cx, cy, 20);
 
-        // Maybe if I understood what the parallactic angle actually means I could explain, but this
-        // does seem to put the moon right-side up, at least when it's up, if that even makes sense.
-        moonPixels.draw(dc, skyCalc.x(), skyCalc.y(), 20, parallactic, illuminationFraction, phase);
+        moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), parallactic, illuminationFraction, phase);
     }
 
     private function draw64ColorPalette(dc as Dc) as Void {
         var s = 8;
 
-        for (var z = 0; z < 4; z += 1) {
-        for (var x = 0; x < 4; x += 1) {
+        for (var z = 0; z < 4; z += 1) {        for (var x = 0; x < 4; x += 1) {
         for (var y = 0; y < 4; y += 1) {
             var color = ((z * 85) << 16)  // red: a whole square for each level
                       + ((x * 85) << 8)   // green: a column for each level
@@ -339,5 +337,55 @@ class moonfaceView extends WatchUi.WatchFace {
             hours = ((hours + 11) % 12) + 1;
         }
         return hours.toString();
+    }
+}
+
+class MoonBuffer {
+    // How long in seconds to keep re-using previously-rendered pixels before starting fresh
+    const RENDER_INTERVAL = new Duration(5*60);
+
+    var radius as Number;
+    var pixelData as MoonPixels;
+
+    // Strong reference, keeps the buffer in memory once it's created.
+    var bitmap as BufferedBitmap?;
+
+    // When present, the same pixels will be saved and re-used until we pass this time.
+    var validUntil as Moment?;
+    // In the simulator (and maybe when the time is adjusted?) the time can jump backward
+    var validFrom as Moment?;
+
+    function initialize(radius as Number) {
+        self.radius = radius;
+        pixelData = new MoonPixels();
+    }
+
+    function draw(dc as Dc, x as Number, y as Number, angle as Decimal, fraction as Decimal, phase as Decimal) as Void {
+        if (bitmap == null) {
+            //Test.assert(Graphics has :createBufferedBitmap);
+            var ref = Graphics.createBufferedBitmap({
+                :width => radius*2, :height => radius*2,
+                // TODO: save memory and possibly time by using a limited palette?
+                //:palette => [0x555555, 0xAAAAA, 0xFFFFFF, 0x0] as Array<ColorType>
+            });
+            bitmap = ref.get();
+        }
+
+        var now = Time.now();
+        if (validUntil == null or now.greaterThan(validUntil) or (validFrom != null and now.lessThan(validFrom))) {
+            System.println("Rendering...");
+
+            var bufferDc = bitmap.getDc();
+            bufferDc.clear();
+            pixelData.draw(bufferDc, radius, radius, radius, angle, fraction, phase);
+
+            validFrom = now;
+            validUntil = now.add(RENDER_INTERVAL);
+        }
+        else {
+            System.println("Using previous rendering");
+        }
+
+        dc.drawBitmap(x - radius, y - radius, bitmap);
     }
 }
