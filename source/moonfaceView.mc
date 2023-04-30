@@ -1,4 +1,5 @@
 import Toybox.Application;
+using Toybox.Complications;
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Position;
@@ -63,9 +64,6 @@ class moonfaceView extends WatchUi.WatchFace {
         var end = System.getTimer();
 
         dc.setColor(Graphics.COLOR_WHITE, -1);
-        dc.drawText(dc.getWidth()/2, dc.getHeight()-30, Graphics.FONT_XTINY,
-            location.toString(),
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.drawText(dc.getWidth()/2, dc.getHeight()-10, Graphics.FONT_XTINY,
             Lang.format("$1$ms", [end - start]),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -134,8 +132,6 @@ class moonfaceView extends WatchUi.WatchFace {
 
             // Draw indices, numerals, and the sun itself
             drawSunTrack(dc, sunrise, sunset, localNow);
-            // Indicating direction reference for what view of the sky we're dealing with
-            drawCompass(dc);
 
             drawSunTrackOffDial(dc, location, Time.today(), indexColor);
 
@@ -152,11 +148,33 @@ class moonfaceView extends WatchUi.WatchFace {
 
         drawTime(dc, clockTime);
 
-        // TODO: add a single complication below the time? e.g. "Tue 18"
+        // Indicating direction reference for what view of the sky we're dealing with.
+        // Drawn after the time, which can overlap it slightly
+        drawCompass(dc);
+
+        dc.setColor(Graphics.COLOR_WHITE, -1);
+
+        // One complication under the time
+        // TODO: make it a setting
+        var complication = Complications.getComplication(new Complications.Id(Complications.COMPLICATION_TYPE_WEEKDAY_MONTHDAY));
+        if (complication != null) {
+            dc.drawText(dc.getWidth()/2, dc.getHeight()-55, Graphics.FONT_TINY,
+                Lang.format("$1$", [complication.value]),
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+
+        // Coords:
+        if (location != null) {
+            dc.drawText(dc.getWidth()/2, dc.getHeight()-30, Graphics.FONT_XTINY,
+                location.toString(),
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
 
         // Note: draw *after* the view's layout is rendered
         // draw64ColorPalette(dc);
     }
+
+
 
     private function drawDialBackground(dc as Dc, faceColor as ColorType) as Void {
         var width = dc.getWidth();
@@ -181,14 +199,14 @@ class moonfaceView extends WatchUi.WatchFace {
 
         var timeY;
         var bgColor;
-        if (isMoonUp) {
-            timeY = 50;  // FIXME: needs scaling for font size
+        // if (isMoonUp) {
+            timeY = 40;  // FIXME: needs scaling for font size
             bgColor = COLOR_UNDERWORLD;
-        }
-        else {
-            timeY = -30;  // FIXME: needs scaling for font size
-            bgColor = isSunUp ? COLOR_DAY_SKY : COLOR_NIGHT_SKY;
-        }
+        // }
+        // else {
+        //     timeY = -30;  // FIXME: needs scaling for font size
+        //     bgColor = isSunUp ? COLOR_DAY_SKY : COLOR_NIGHT_SKY;
+        // }
         dc.setColor(Graphics.COLOR_WHITE, bgColor);
         dc.drawText(width/2, height/2 + timeY, Graphics.FONT_NUMBER_MILD, timeString,
             Graphics.TEXT_JUSTIFY_CENTER|Graphics.TEXT_JUSTIFY_VCENTER);
