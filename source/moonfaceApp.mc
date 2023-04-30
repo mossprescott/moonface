@@ -26,6 +26,9 @@ class moonfaceApp extends Application.AppBase {
         WatchUi.requestUpdate();
     }
 
+    function getSettingsView() {
+        return [new SettingsMenu(), new SettingsMenuDelegate()];
+    }
 }
 
 function getApp() as moonfaceApp {
