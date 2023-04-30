@@ -32,7 +32,7 @@ class Orbits {
 
     // Radians per degree:
     // private static var rad as Radians = Math.PI/180;
-    private static function toRadians(x as Degrees) as Radians { return x*Math.PI/180; }
+    /*private*/ static function toRadians(x as Degrees) as Radians { return x*Math.PI/180; }
 
     //
     // Date/time constants and conversions in weird astronomical units:
@@ -132,10 +132,9 @@ class Orbits {
     // Viewer-relative position of the sun at a moment in time.
     // :azimuth => north = 0.
     // :altitude => horizon = 0.
-    public static function sunPosition(time as Moment, loc /*as Location*/) as Dictionary<Symbol, Radians> {
-        var coords = loc.toRadians();
-        var lw  = -coords[1];
-        var phi = coords[0];
+    public static function sunPosition(time as Moment, loc /*as Location3*/) as Dictionary<Symbol, Radians> {
+        var lw  = -loc.longitude;
+        var phi = loc.latitude;
         var d   = toDays(time);
 
         var c  = erase(sunCoords(d));
@@ -188,10 +187,10 @@ class Orbits {
     //
     // Note: for our purposes, local time of day would be more useful, but this is at least
     // clearly defined and you can get there from here.
-    public static function sunTimes(date as Moment, loc /*as Location*/, height as Float) as Dictionary<Symbol, Moment> {
-        var coords = loc.toRadians();
-        var lw  = -coords[1];
-        var phi = coords[0];
+    public static function sunTimes(date as Moment, loc /*as Location3*/) as Dictionary<Symbol, Moment> {
+        var lw  = -loc.longitude;
+        var phi = loc.latitude;
+        var height = loc.altitude != null ? loc.altitude : 0.0;
 
         var dh = observerAngle(height);
 
@@ -248,10 +247,9 @@ class Orbits {
 
     // Position of the moon in the sky, given the viewer's location.
     // { :azimuth, :altitude, :distance (km), :parallacticAngle }
-    public static function moonPosition(date as Moment, loc /*as Position*/) as Dictionary<Symbol, Decimal> {
-        var coords = loc.toRadians();
-        var lw  = -coords[1];
-        var phi = coords[0];
+    public static function moonPosition(date as Moment, loc /*as Location3*/) as Dictionary<Symbol, Decimal> {
+        var lw  = -loc.longitude;
+        var phi = loc.latitude;
         var d   = toDays(date);
 
         var c = erase(moonCoords(d));
@@ -382,6 +380,10 @@ class Orbits {
 }
 
 (:test)
+const hamden = new Location3(Orbits.toRadians(41.3460), Orbits.toRadians(-72.9125), 30.0);
+
+
+(:test)
 function testSunPosition(logger as Logger) as Boolean {
 
     // For reference, from my Swift port:
@@ -405,9 +407,7 @@ function testSunPosition(logger as Logger) as Boolean {
     // illumination: (fraction: 0.06630886962389404, phase: 0.9170995880185985, angle: 1.0574608202017584)
     // rise: 4/17/2023, 05:11; set: 4/17/2023, 17:03
 
-
     var april17 = new Moment(1681754720);
-    var hamden = new Position.Location({:latitude => 41.3460, :longitude => -72.9125, :format => :degrees});
 
     var pos = Orbits.sunPosition(april17, hamden);
     assertApproximatelyEqual(pos.get(:azimuth), 0.5736, 0.01, logger);
@@ -420,10 +420,9 @@ function testSunPosition(logger as Logger) as Boolean {
 
 (:test)
 function testSunTimes(logger as Logger) as Boolean {
-    var hamden = new Position.Location({:latitude => 41.3460, :longitude => -72.9125, :format => :degrees});
     var midnight = Gregorian.moment({:year => 2023, :month => :april, :day => 17, :hour => 4, :minute => 0, :second => 0});
 
-    var times = Orbits.sunTimes(midnight, hamden, 30.0);
+    var times = Orbits.sunTimes(midnight, hamden);
 
     assertEqualLog(formatTime(times.get(:noon)),  "2023-04-17 12:52", logger);
     assertEqualLog(formatTime(times.get(:nadir)), "2023-04-17 00:52", logger);
@@ -436,11 +435,11 @@ function testSunTimes(logger as Logger) as Boolean {
 // Note: the test assumes it's running in EST
 (:test)
 function testSunTimes2(logger as Logger) as Boolean {
-    var guadalajara = new Position.Location({:latitude => 20.66, :longitude => -103.35, :format => :degrees});
+    // Note: actual elevation is 1543m, but timeanddate.com seems to be ignoring that.
+    var guadalajara = new Location3(Orbits.toRadians(20.66), Orbits.toRadians(-103.35), 0.0);
     var midnight = Gregorian.moment({:year => 2023, :month => :august, :day => 15, :hour => 6, :minute => 0, :second => 0});
 
-    // Note: actual elevation is 1543, but timeanddate.com seems to be ignoring that.
-    var times = Orbits.sunTimes(midnight, guadalajara, 0.0); //1543.0);
+    var times = Orbits.sunTimes(midnight, guadalajara);
 
     assertEqualLog(formatTime(times.get(:noon)),  "2023-08-15 14:59", logger);  // Actual: 14:57
     assertEqualLog(formatTime(times.get(:nadir)), "2023-08-15 02:59", logger);
@@ -453,7 +452,6 @@ function testSunTimes2(logger as Logger) as Boolean {
 (:test)
 function testMoonPosition(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
-    var hamden = new Position.Location({:latitude => 41.3460, :longitude => -72.9125, :format => :degrees});
 
     var pos = Orbits.moonPosition(april17, hamden);
     assertApproximatelyEqual(pos.get(:azimuth),          0.9277, 0.01, logger);

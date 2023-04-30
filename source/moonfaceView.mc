@@ -27,6 +27,8 @@ class moonfaceView extends WatchUi.WatchFace {
 
     var moonBuffer as MoonBuffer;
 
+    var location as Location3?;
+
     // Cache some state between draw calls:
     var isMoonUp as Boolean = true;
     var isSunUp as Boolean = true;
@@ -51,10 +53,19 @@ class moonfaceView extends WatchUi.WatchFace {
     // Update the view
     function onUpdate(dc as Dc) as Void {
         System.println("onUpdate()");
-        var start = System.getTimer();        drawAll(dc, false);
+
+        location = Location3.getLocation();
+        if (location == null) { location = new Location3(41.3460, -72.9125, 30.0); } // Hamden
+        else if (location.altitude == null) { location.altitude = 0.0; }
+
+        var start = System.getTimer();
+        drawAll(dc, false);
         var end = System.getTimer();
 
         dc.setColor(Graphics.COLOR_WHITE, -1);
+        dc.drawText(dc.getWidth()/2, dc.getHeight()-30, Graphics.FONT_XTINY,
+            location.toString(),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.drawText(dc.getWidth()/2, dc.getHeight()-10, Graphics.FONT_XTINY,
             Lang.format("$1$ms", [end - start]),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -96,25 +107,21 @@ class moonfaceView extends WatchUi.WatchFace {
             // UTC time for astronomical calculations:
             var now = Time.now();
 
-            // HACK:
-            var hamden = new Position.Location({:latitude => 41.3460, :longitude => -72.9125, :format => :degrees});
-            var loc = hamden;
-            var elevation = 30.0;
-
             // TODO: redraw only seconds when appropriate? Or request one update per minute?
 
-            var sunTimes = Orbits.sunTimes(now, loc, elevation);
-            var sunrise = localTimeOfDay(sunTimes.get(:rise));
-            var sunset = localTimeOfDay(sunTimes.get(:set));
+            var sunTimes = Orbits.sunTimes(now, location);
+            var sunrise = localTimeOfDay(sunTimes.get(:rise) as Moment);
+            var sunset = localTimeOfDay(sunTimes.get(:set) as Moment);
 
-            var sunPosition = Orbits.sunPosition(now, loc);
-            var moonPosition = Orbits.moonPosition(now, loc);
+            var sunPosition = Orbits.sunPosition(now, location);
+            var moonPosition = Orbits.moonPosition(now, location);
+            // TODO: don't recalculate the illumination every time since we only redraw periodically
             var moonIllumination = Orbits.moonIllumination(now);
             // System.println(moonIllumination);
 
             var localNow = localTimeOfDay(now);
             isSunUp = localNow >= sunrise && localNow <= sunset;
-            isMoonUp = moonPosition.get(:altitude) >= 0;
+            isMoonUp = (moonPosition.get(:altitude) as Decimal) >= 0;
 
             var indexColor = isSunUp ? Graphics.COLOR_BLACK : Graphics.COLOR_LT_GRAY;
 
@@ -130,9 +137,9 @@ class moonfaceView extends WatchUi.WatchFace {
             // Indicating direction reference for what view of the sky we're dealing with
             drawCompass(dc);
 
-            drawSunTrackOffDial(dc, loc, Time.today(), indexColor);
+            drawSunTrackOffDial(dc, location, Time.today(), indexColor);
 
-            drawSun(dc, sunPosition.get(:azimuth), sunPosition.get(:altitude));
+            drawSun(dc, sunPosition.get(:azimuth) as Decimal, sunPosition.get(:altitude) as Decimal);
 
             dc.setAntiAlias(false);
             drawMoon(dc, moonPosition.get(:azimuth), moonPosition.get(:altitude),
@@ -230,7 +237,7 @@ class moonfaceView extends WatchUi.WatchFace {
     }
 
     // Draw an index at the location of the sun at each hour of the day.
-    private function drawSunTrackOffDial(dc as Dc, loc as Position.Location, midnight as Moment, indexColor as ColorType) as Void {
+    private function drawSunTrackOffDial(dc as Dc, loc as Location3, midnight as Moment, indexColor as ColorType) as Void {
         var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
 
         dc.setColor(indexColor, COLOR_NONE);
