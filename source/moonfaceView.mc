@@ -49,7 +49,7 @@ class moonfaceView extends WatchUi.WatchFace {
     // the state of this View and prepare it to be shown. This includes
     // loading resources into memory.
     function onShow() as Void {
-        showSeconds = Properties.getValue("ShowSeconds");
+        showSeconds = Properties.getValue("ShowSeconds") as Boolean;
     }
 
     // Update the view
@@ -66,7 +66,8 @@ class moonfaceView extends WatchUi.WatchFace {
     // Called when this View is removed from the screen. Save the
     // state of this View here. This includes freeing resources from
     // memory.
-    function onHide() as Void {    }
+    function onHide() as Void {
+    }
 
     // The user has just looked at their watch.
     function onExitSleep() as Void {
@@ -350,7 +351,8 @@ class moonfaceView extends WatchUi.WatchFace {
     private function draw64ColorPalette(dc as Dc) as Void {
         var s = 8;
 
-        for (var z = 0; z < 4; z += 1) {        for (var x = 0; x < 4; x += 1) {
+        for (var z = 0; z < 4; z += 1) {
+        for (var x = 0; x < 4; x += 1) {
         for (var y = 0; y < 4; y += 1) {
             var color = ((z * 85) << 16)  // red: a whole square for each level
                       + ((x * 85) << 8)   // green: a column for each level
@@ -406,7 +408,8 @@ class MoonBuffer {
             var ref = Graphics.createBufferedBitmap({
                 :width => radius*2, :height => radius*2,
                 // TODO: save memory and possibly time by using a limited palette?
-                //:palette => [0x555555, 0xAAAAA, 0xFFFFFF, 0x0] as Array<ColorType>
+                // :palette => [0xFF000000, 0xFF555555, 0xFFAAAAAA, 0xFFFFFFFF, 0x00000000] as Array<ColorType>
+                // :palette => [0x000000, 0xFFFFFF] as Array<ColorType>
             });
             bitmap = ref.get();
         }
