@@ -84,10 +84,13 @@ class Location3 {
         var altitude = null;
 
         var activity = erase(Activity.getActivityInfo());
-        if (activity != null and activity.currentLocation != null) {
-            loc = activity.currentLocation;
-            altitude = activity.altitude;
-            System.println("Found position from current/recent activity");
+        if (activity != null) {
+            System.println("Activity present");
+            if (activity.currentLocation != null) {
+                loc = activity.currentLocation;
+                altitude = activity.altitude;
+                System.println("Found position from current/recent activity");
+            }
         }
 
         if (loc == null) {
@@ -95,6 +98,8 @@ class Location3 {
             if (weather != null) {
                 loc = erase(weather).observationLocationPosition;
                 // Note: altitude not provided
+                // TODO: maybe use a stored altitude as an approximate value, if the position
+                // is otherwise fairly close.
                 System.println("Found position from current weather conditions");
             }
         }
@@ -103,7 +108,13 @@ class Location3 {
             var coords = loc.toRadians();
             var latitude = coords[0].toFloat();
             var longitude = coords[1].toFloat();
-            return new Location3(latitude, longitude, altitude);
+            if (altitude != null and altitude < 0.0) {
+                System.println(Lang.format("Pinning negative altitude: $1$m", [altitude.format("%0.1f")]));
+                altitude = 0;
+            }
+            var result = new Location3(latitude, longitude, altitude);
+            System.println(result);
+            return result;
         }
         else {
             return null;
