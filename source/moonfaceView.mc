@@ -216,7 +216,7 @@ class moonfaceView extends WatchUi.WatchFace {
         var timeY;
         var bgColor;
         // if (isMoonUp) {
-            timeY = 40;  // FIXME: needs scaling for font size
+            timeY = 37;  // FIXME: needs scaling for font size
             bgColor = COLOR_UNDERWORLD;
         // }
         // else {
@@ -224,7 +224,7 @@ class moonfaceView extends WatchUi.WatchFace {
         //     bgColor = isSunUp ? COLOR_DAY_SKY : COLOR_NIGHT_SKY;
         // }
         dc.setColor(Graphics.COLOR_WHITE, bgColor);
-        dc.drawText(width/2, height/2 + timeY, Graphics.FONT_NUMBER_MILD, timeString,
+        dc.drawText(width/2, height/2 + timeY, Graphics.FONT_NUMBER_MEDIUM, timeString,
             Graphics.TEXT_JUSTIFY_CENTER|Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
