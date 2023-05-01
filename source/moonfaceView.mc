@@ -178,7 +178,7 @@ class moonfaceView extends WatchUi.WatchFace {
         }
     }
 
-    private function drawSPF(dc as Dc, start as Number, end as Number) {
+    private function drawSPF(dc as Dc, start as Number, end as Number) as Void {
         dc.setColor(Graphics.COLOR_WHITE, -1);
         dc.drawText(dc.getWidth()/2, dc.getHeight()-10, Graphics.FONT_XTINY,
             Lang.format("$1$ms", [end - start]),
