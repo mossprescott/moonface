@@ -4,4 +4,5 @@
     <property id="UseMilitaryFormat" type="boolean">false</property> -->
 
     <property id="ShowSeconds" type="boolean">false</property>
+    <property id="ShowSPF" type="boolean">true</property>
 </properties>

@@ -33,6 +33,7 @@ class moonfaceView extends WatchUi.WatchFace {
     // Cache some state between draw calls:
     var isMoonUp as Boolean = true;
     var isSunUp as Boolean = true;
+    var frameCount as Number = 0;
 
     function initialize() {
         WatchFace.initialize();
@@ -59,14 +60,7 @@ class moonfaceView extends WatchUi.WatchFace {
         if (location == null) { location = new Location3(41.3460, -72.9125, 30.0); } // Hamden
         else if (location.altitude == null) { location.altitude = 0.0; }
 
-        var start = System.getTimer();
         drawAll(dc, false);
-        var end = System.getTimer();
-
-        dc.setColor(Graphics.COLOR_WHITE, -1);
-        dc.drawText(dc.getWidth()/2, dc.getHeight()-10, Graphics.FONT_XTINY,
-            Lang.format("$1$ms", [end - start]),
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     // Called when this View is removed from the screen. Save the
@@ -98,6 +92,9 @@ class moonfaceView extends WatchUi.WatchFace {
 
 
     private function drawAll(dc as Dc, secondsOnly as Boolean) as Void {
+        var frameStart = System.getTimer();
+        frameCount += 1;
+
         // Local time for display:
         var clockTime = System.getClockTime();
 
@@ -172,6 +169,24 @@ class moonfaceView extends WatchUi.WatchFace {
 
         // Note: draw *after* the view's layout is rendered
         // draw64ColorPalette(dc);
+
+        var frameEnd = System.getTimer();
+
+        if (Properties.getValue("ShowSPF") as Boolean) {
+            drawSPF(dc, frameStart, frameEnd);
+        }
+    }
+
+    private function drawSPF(dc as Dc, start as Number, end as Number) {
+        dc.setColor(Graphics.COLOR_WHITE, -1);
+        dc.drawText(dc.getWidth()/2, dc.getHeight()-10, Graphics.FONT_XTINY,
+            Lang.format("$1$ms", [end - start]),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // A tiny indicator so you can tell how often drawing is happining:
+        if (frameCount & 1 == 0) {
+            dc.drawPoint(dc.getWidth()/2, dc.getHeight()-1);
+        }
     }
 
 
