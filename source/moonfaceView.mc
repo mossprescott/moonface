@@ -20,7 +20,7 @@ const COLOR_NONE as ColorType = -1;
 
 const TRACK_WIDTH as Number = 15;
 
-const MOON_RADIUS = 20;
+const MOON_RADIUS = 30;
 
 
 class moonfaceView extends WatchUi.WatchFace {
@@ -392,6 +392,8 @@ class MoonBuffer {
     // Strong reference, keeps the buffer in memory once it's created.
     var bitmap as BufferedBitmap?;
 
+    var drawCont as Number?;
+
     // When present, the same pixels will be saved and re-used until we pass this time.
     var validUntil as Moment?;
     // In the simulator (and maybe when the time is adjusted?) the time can jump backward
@@ -411,7 +413,7 @@ class MoonBuffer {
                 // :palette => [0xFF000000, 0xFF555555, 0xFFAAAAAA, 0xFFFFFFFF, 0x00000000] as Array<ColorType>
                 // :palette => [0x000000, 0xFFFFFF] as Array<ColorType>
             });
-            bitmap = ref.get();
+            bitmap = ref.get() as BufferedBitmap;
         }
 
         var now = Time.now();
@@ -420,10 +422,15 @@ class MoonBuffer {
 
             var bufferDc = bitmap.getDc();
             bufferDc.clear();
-            pixelData.draw(bufferDc, radius, radius, radius, angle, fraction, phase);
+            drawCont = pixelData.draw(bufferDc, radius, radius, radius, angle, fraction, phase, null);
 
             validFrom = now;
             validUntil = now.add(RENDER_INTERVAL);
+        }
+        else if (drawCont != null) {
+            System.println(Lang.format("Continue rendering from row $1$...", [drawCont]));
+            var bufferDc = bitmap.getDc();
+            drawCont = pixelData.draw(bufferDc, radius, radius, radius, angle, fraction, phase, drawCont);
         }
         else {
             System.println("Using previous rendering");

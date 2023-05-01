@@ -15,7 +15,7 @@ const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 // A limit on the total amount of points to ever draw in a single cycle, to avoid
 // running into the execution time limit. No way to come up with a precise figure,
 // this is the result of a little trial and error.
-const MAX_PLOTTED as Number = 700;
+const MAX_PLOTTED as Number = 800;
 
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
 // JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
@@ -45,11 +45,19 @@ class MoonPixels {
     //     return getRectangular(x, y);
     // }
 
+    // Draw some rows of the moon's face, at the given location and size, as specified by angle,
+    // fraction, and phase.
+    //
+    // The amount of work done on any single call is limited to avoid exceeding the limit on
+    // execution time for a watch face. If drawing isn't completed, the result contains the
+    // next row to be drawn, which can be passed in fromRow to a later call to continue drawing
+    // where it left off.
     public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number,
-                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
+                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal,
+                         fromRow as Number?) as Number? {
         // TODO: uh, dither?
 
-        var HALF_OPAQUE = false;
+        // var HALF_OPAQUE = false;
 
         var cos = Math.cos(-parallacticAngle);
         var sin = Math.sin(-parallacticAngle);
@@ -82,13 +90,15 @@ class MoonPixels {
         var lastColor = 0xFFFFFF;
         var plottedCount = 0;
 
-        for (var y = -radius; y <= radius; y += 1) {
+        var startRow = fromRow != null ? fromRow : -radius;
+        for (var y = startRow; y <= radius; y += 1) {
             for (var x = -radius; x <= radius; x += 1) {
                 var val;
-                if (HALF_OPAQUE and (y+x)&1 == 0) {
-                    continue;
-                }
-                else if (y*y + x*x > rsq) {
+                // if (HALF_OPAQUE and (y+x)&1 == 0) {
+                //     continue;
+                // }
+                //else
+                if (y*y + x*x > rsq) {
                     // Skip some calculation; the point is clearly outside the disk
                     continue;
                 }
@@ -132,17 +142,19 @@ class MoonPixels {
 
                     if (plottedCount >= MAX_PLOTTED) {
                         System.println(Lang.format("Aborting drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
-                        return;
+                        return y;
                     }
-                    else if (!HALF_OPAQUE and plottedCount > MAX_PLOTTED*0.60) {
-                        System.println(Lang.format("Switching to 50% drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
-                        HALF_OPAQUE = true;
-                    }
+                    // else if (!HALF_OPAQUE and plottedCount > MAX_PLOTTED*0.60) {
+                    //     System.println(Lang.format("Switching to 50% drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
+                    //     HALF_OPAQUE = true;
+                    // }
                 }
             }
         }
 
         //System.println(Lang.format("plotted: $1$", [plottedCount]));
+
+        return null;
     }
 
     // Get the value, if any, for a point given in rectagular coords from the center of the disk.
@@ -280,4 +292,7 @@ Current (dumb) option:
 
 All these decoding options sound like lot of allocation of temporary arrays and boxed values,
 but what choice are they giving me?
+
+Simulator vs. device:
+- draw time: 52ms in sim; 600ms on device
 */
