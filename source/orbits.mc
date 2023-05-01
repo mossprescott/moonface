@@ -22,13 +22,13 @@ typedef Degrees as Decimal;
 // comments.
 class Orbits {
     // Local aliases for convenience:
-    private static function sin(x as Radians) as Float { return Math.sin(x); }
-    private static function cos(x as Radians) as Float { return Math.cos(x); }
-    private static function tan(x as Radians) as Float { return Math.tan(x); }
-    private static function asin(x as Float) as Radians { return Math.asin(x); }
-    private static function acos(x as Float) as Radians { return Math.acos(x); }
-    private static function atan(x as Float) as Radians { return Math.atan(x); }
-    private static function atan2(x as Float, y as Float) as Radians { return Math.atan2(x, y); }
+    private static function sin(x as Radians) as Decimal { return Math.sin(x); }
+    private static function cos(x as Radians) as Decimal { return Math.cos(x); }
+    private static function tan(x as Radians) as Decimal { return Math.tan(x); }
+    private static function asin(x as Decimal) as Radians { return Math.asin(x); }
+    private static function acos(x as Decimal) as Radians { return Math.acos(x); }
+    private static function atan(x as Decimal) as Radians { return Math.atan(x); }
+    private static function atan2(x as Decimal, y as Decimal) as Radians { return Math.atan2(x, y); }
 
     // Radians per degree:
     // private static var rad as Radians = Math.PI/180;
