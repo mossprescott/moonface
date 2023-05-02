@@ -57,7 +57,7 @@ class moonfaceView extends WatchUi.WatchFace {
         System.println("onUpdate()");
 
         location = Location3.getLocation();
-        if (location == null) { location = new Location3(41.3460, -72.9125, 30.0); } // Hamden
+        if (location == null) { location = new Location3(Orbits.toRadians(41.3460), Orbits.toRadians(-72.9125), 30.0); } // Hamden
         else if (location.altitude == null) { location.altitude = 0.0; }
 
         drawAll(dc, false);
@@ -67,6 +67,7 @@ class moonfaceView extends WatchUi.WatchFace {
     // state of this View here. This includes freeing resources from
     // memory.
     function onHide() as Void {
+        // TODO: dump the moon bitmap? or the strong reference to it
     }
 
     // The user has just looked at their watch.
@@ -331,7 +332,17 @@ class moonfaceView extends WatchUi.WatchFace {
         skyCalc.setPosition(azimuth, altitude);
 
         dc.setColor(COLOR_SUN, COLOR_NONE);
-        dc.fillCircle(skyCalc.x(), skyCalc.y(), 5);
+        if (skyCalc.onscreen()) {
+            if (altitude >= 0) {
+                dc.fillCircle(skyCalc.x(), skyCalc.y(), 5);
+            }
+            else {
+                dc.drawCircle(skyCalc.x(), skyCalc.y(), 5);
+            }
+        }
+        else {
+            drawOffscreenIndicator(dc, skyCalc, 6);
+        }
     }
 
     // azimuth: radians with 0 at north
@@ -342,10 +353,30 @@ class moonfaceView extends WatchUi.WatchFace {
         var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
         skyCalc.setPosition(azimuth, altitude);
 
-        // dc.setColor(Graphics.COLOR_LT_GRAY, COLOR_NONE);
-        // dc.drawCircle(cx, cy, 20);
+        if (skyCalc.onscreen()) {
+            if (altitude >= 0) {
+                moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), parallactic, illuminationFraction, phase);
+            }
+            else {
+                dc.setColor(Graphics.COLOR_LT_GRAY, -1);
+                dc.drawCircle(skyCalc.x(), skyCalc.y(), 10);
+            }
+        }
+        else {
+            dc.setColor(Graphics.COLOR_LT_GRAY, -1);
+            drawOffscreenIndicator(dc, skyCalc, 6);
+        }
+    }
 
-        moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), parallactic, illuminationFraction, phase);
+    private function drawOffscreenIndicator(dc as Dc, calc as SkyCalculator, size as Number) as Void {
+        var x = calc.pinnedX();
+        var y = calc.y();
+        if (x < dc.getWidth()/2) {
+            dc.fillPolygon([[x+size, y-size], [x+size, y+size], [x, y]] as Array<Array<Numeric>>);
+        }
+        else {
+            dc.fillPolygon([[x-size, y-size], [x, y], [x-size, y+size]] as Array<Array<Numeric>>);
+        }
     }
 
     private function draw64ColorPalette(dc as Dc) as Void {

@@ -40,6 +40,14 @@ class SkyCalculator {
         // System.println(Lang.format("$1$, $2$", [azimuth, altitude]));
     }
 
+    // Is the point onscreen, assuming a circular display?
+    public function onscreen() as Boolean {
+        var x = x() - width/2;
+        var y = y() - height/2;
+        var r = width/2;
+        return x*x + y*y <= r*r;
+    }
+
     public function x() as Number {
         return width/2 + Math.round((width/3)*azimuth/(Math.PI/2)).toNumber();
     }
@@ -48,6 +56,19 @@ class SkyCalculator {
         // var fraction = altitude/(Math.PI/2);
         var fraction = Math.sin(altitude);
         return height/2 - Math.round((height/2)*MAX_HEIGHT*fraction).toNumber();
+    }
+
+    // If the point is offscreen, this is the x-coord of the nearest point at the left or right edge
+    // of the display at the same y-coord (assuming a circular display.)
+    public function pinnedX() as Number {
+        var y = y() - height/2;
+        var r = width/2;
+        if (x() < width/2) {
+            return width/2 - Math.round(Math.sqrt(r*r - y*y));
+        }
+        else {
+            return width/2 + Math.round(Math.sqrt(r*r - y*y));
+        }
     }
 }
 
