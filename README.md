@@ -6,8 +6,8 @@ and the current location of the sun and moon.
 Below that, the time as `HH:MM` or `HH:MM:SS`, followed by day-of-week and -month,
 and finally the coordinates being used for projection.
 
-<img src="screenshot-day.png" width=405 height=556 alt="Watchface: Day">
-<img src="screenshot-night.png" width=405 height=556 alt="Watchface: Night">
+<img src="screenshot-day.png" width=203 height=278 alt="Watchface: Day">
+<img src="screenshot-night.png" width=203 height=278 alt="Watchface: Night">
 
 The idea is to visualize the spatial relationship between viewer, sun, and moon, and how
 the moon's appearance changes as a result. More simply, it shows when and where to look for the moon
