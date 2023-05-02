@@ -379,9 +379,6 @@ class Orbits {
 
 }
 
-(:test)
-const hamden = new Location3(Orbits.toRadians(41.3460), Orbits.toRadians(-72.9125), 30.0);
-
 
 (:test)
 function testSunPosition(logger as Logger) as Boolean {
@@ -409,7 +406,7 @@ function testSunPosition(logger as Logger) as Boolean {
 
     var april17 = new Moment(1681754720);
 
-    var pos = Orbits.sunPosition(april17, hamden);
+    var pos = Orbits.sunPosition(april17, Hamden);
     assertApproximatelyEqual(pos.get(:azimuth), 0.5736, 0.01, logger);
     assertApproximatelyEqual(pos.get(:altitude), 0.9617, 0.01, logger);
 
@@ -422,7 +419,7 @@ function testSunPosition(logger as Logger) as Boolean {
 function testSunTimes(logger as Logger) as Boolean {
     var midnight = Gregorian.moment({:year => 2023, :month => :april, :day => 17, :hour => 4, :minute => 0, :second => 0});
 
-    var times = Orbits.sunTimes(midnight, hamden);
+    var times = Orbits.sunTimes(midnight, Hamden);
 
     assertEqualLog(formatTime(times.get(:noon)),  "2023-04-17 12:52", logger);
     assertEqualLog(formatTime(times.get(:nadir)), "2023-04-17 00:52", logger);
@@ -453,7 +450,7 @@ function testSunTimes2(logger as Logger) as Boolean {
 function testMoonPosition(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
 
-    var pos = Orbits.moonPosition(april17, hamden);
+    var pos = Orbits.moonPosition(april17, Hamden);
     assertApproximatelyEqual(pos.get(:azimuth),          0.9277, 0.01, logger);
     assertApproximatelyEqual(pos.get(:altitude),         0.5089, 0.01, logger);
     assertApproximatelyEqual(pos.get(:distance),      369507.90,  1.0, logger);
