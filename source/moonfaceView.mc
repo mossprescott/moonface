@@ -197,9 +197,9 @@ class moonfaceView extends WatchUi.WatchFace {
             Lang.format("$1$ms", [end - start]),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // A tiny indicator so you can tell how often drawing is happining:
+        // A tiny indicator so you can tell how often drawing is happening:
         if (frameCount & 1 == 0) {
-            dc.drawPoint(dc.getWidth()/2, dc.getHeight()-1);
+            dc.drawRectangle(dc.getWidth()/2-1, dc.getHeight()-2, 2, 2);
         }
     }
 
