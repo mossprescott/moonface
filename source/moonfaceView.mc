@@ -22,6 +22,8 @@ const TRACK_WIDTH as Number = 15;
 
 const MOON_RADIUS = 30;
 
+const Hamden as Location3 = new Location3(Orbits.toRadians(41.3460), Orbits.toRadians(-72.9125), 30.0);
+const NewOrleans as Location3 = new Location3(Orbits.toRadians(29.97), Orbits.toRadians(-90.3), 1.0);
 
 class moonfaceView extends WatchUi.WatchFace {
     static var showSeconds as Boolean = false;
@@ -56,9 +58,19 @@ class moonfaceView extends WatchUi.WatchFace {
     function onUpdate(dc as Dc) as Void {
         System.println("onUpdate()");
 
-        location = Location3.getLocation();
-        if (location == null) { location = new Location3(Orbits.toRadians(41.3460), Orbits.toRadians(-72.9125), 30.0); } // Hamden
-        else if (location.altitude == null) { location.altitude = 0.0; }
+        switch (Properties.getValue("LocationOption") as LocationOption) {
+            case hamden:
+                location = Hamden;
+                break;
+            case newOrleans:
+                location = NewOrleans;
+                break;
+            default:
+                location = Location3.getLocation();
+                if (location == null) { location = Hamden; }
+                else if (location.altitude == null) { location.altitude = 0.0; }
+                break;
+        }
 
         drawAll(dc, false);
     }

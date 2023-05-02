@@ -30,4 +30,12 @@
         <settingConfig type="boolean" />
     </setting>
 
+    <setting propertyKey="@Properties.LocationOption" title="@Strings.LocationOptionTitle">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.LocationOptionAuto</listEntry>
+            <listEntry value="1">@Strings.LocationOptionHamden</listEntry>
+            <listEntry value="2">@Strings.LocationOptionNewOrleans</listEntry>
+        </settingConfig>
+    </setting>
+
 </settings>
