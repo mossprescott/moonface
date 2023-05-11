@@ -20,7 +20,8 @@ const COLOR_NONE as ColorType = -1;
 
 const TRACK_WIDTH as Number = 15;
 
-const MOON_RADIUS = 30;
+const MOON_UP_RADIUS = 30;
+const MOON_DOWN_RADIUS = 15;
 
 const Hamden as Location3 = new Location3(Orbits.toRadians(41.3460), Orbits.toRadians(-72.9125), 30.0);
 const NewOrleans as Location3 = new Location3(Orbits.toRadians(29.97), Orbits.toRadians(-90.3), 1.0);
@@ -40,7 +41,7 @@ class moonfaceView extends WatchUi.WatchFace {
     function initialize() {
         WatchFace.initialize();
 
-        moonBuffer = new MoonBuffer(MOON_RADIUS);
+        moonBuffer = new MoonBuffer(MOON_UP_RADIUS);
     }
 
     // Load your resources here
@@ -367,11 +368,11 @@ class moonfaceView extends WatchUi.WatchFace {
 
         if (skyCalc.onscreen()) {
             if (altitude >= 0) {
-                moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), parallactic, illuminationFraction, phase);
+                moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), MOON_UP_RADIUS, parallactic, illuminationFraction, phase);
             }
             else {
-                dc.setColor(Graphics.COLOR_LT_GRAY, -1);
-                dc.drawCircle(skyCalc.x(), skyCalc.y(), 10);
+                // TODO: use reduced contrast
+                moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), MOON_DOWN_RADIUS, parallactic, illuminationFraction, phase);
             }
         }
         else {
@@ -429,12 +430,16 @@ class MoonBuffer {
     // How long in seconds to keep re-using previously-rendered pixels before starting fresh
     const RENDER_INTERVAL = new Duration(5*60);
 
-    var radius as Number;
+    var maxRadius as Number;
     var pixelData as MoonPixels;
 
     // Strong reference, keeps the buffer in memory once it's created.
     var bitmap as BufferedBitmap?;
 
+    // Radius of previous drawing in the buffer.
+    var savedRadius as Number?;
+
+    // If previous drawing was incomplete, the row to continue with.
     var drawCont as Number?;
 
     // When present, the same pixels will be saved and re-used until we pass this time.
@@ -442,16 +447,16 @@ class MoonBuffer {
     // In the simulator (and maybe when the time is adjusted?) the time can jump backward
     var validFrom as Moment?;
 
-    function initialize(radius as Number) {
-        self.radius = radius;
+    function initialize(maxRadius as Number) {
+        self.maxRadius = maxRadius;
         pixelData = new MoonPixels();
     }
 
-    function draw(dc as Dc, x as Number, y as Number, angle as Decimal, fraction as Decimal, phase as Decimal) as Void {
+    function draw(dc as Dc, x as Number, y as Number, radius as Number, angle as Decimal, fraction as Decimal, phase as Decimal) as Void {
         if (bitmap == null) {
             //Test.assert(Graphics has :createBufferedBitmap);
             var ref = Graphics.createBufferedBitmap({
-                :width => radius*2, :height => radius*2,
+                :width => maxRadius*2, :height => maxRadius*2,
                 // TODO: save memory and possibly time by using a limited palette?
                 // :palette => [0xFF000000, 0xFF555555, 0xFFAAAAAA, 0xFFFFFFFF, 0x00000000] as Array<ColorType>
                 // :palette => [0x000000, 0xFFFFFF] as Array<ColorType>
@@ -459,14 +464,25 @@ class MoonBuffer {
             bitmap = ref.get() as BufferedBitmap;
         }
 
+        var needReset = false;
+
+        if (radius != savedRadius) {
+            needReset = true;
+        }
+
         var now = Time.now();
         if (validUntil == null or now.greaterThan(validUntil) or (validFrom != null and now.lessThan(validFrom))) {
+            needReset = true;
+        }
+
+        if (needReset) {
             System.println("Rendering...");
 
             var bufferDc = bitmap.getDc();
             bufferDc.clear();
             drawCont = pixelData.draw(bufferDc, radius, radius, radius, angle, fraction, phase, null);
 
+            savedRadius = radius;
             validFrom = now;
             validUntil = now.add(RENDER_INTERVAL);
         }
