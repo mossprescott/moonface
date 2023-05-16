@@ -37,8 +37,7 @@ class moonfaceView extends WatchUi.WatchFace {
 
         moonBuffer = new MoonBuffer(MOON_UP_RADIUS);
 
-        // TODO:
-        theme = MFColors.Colorful;
+        theme = MFColors.LightAndDark;
         palette = theme.day;
     }
 
@@ -51,6 +50,20 @@ class moonfaceView extends WatchUi.WatchFace {
     // loading resources into memory.
     function onShow() as Void {
         showSeconds = Properties.getValue("ShowSeconds") as Boolean;
+        switch (Properties.getValue("Theme") as ThemeOption) {
+            case colorful:
+                theme = MFColors.Colorful;
+                break;
+            case light:
+                theme = MFColors.Light;
+                break;
+            case dark:
+                theme = MFColors.Dark;
+                break;
+            case lightAndDark:
+                theme = MFColors.LightAndDark;
+                break;
+        }
     }
 
     // Update the view

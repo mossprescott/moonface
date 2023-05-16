@@ -38,4 +38,13 @@
         </settingConfig>
     </setting>
 
+    <setting propertyKey="@Properties.Theme" title="@Strings.ThemeTitle">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.ThemeColorful</listEntry>
+            <listEntry value="1">@Strings.ThemeLight</listEntry>
+            <listEntry value="2">@Strings.ThemeDark</listEntry>
+            <listEntry value="3">@Strings.ThemeAuto</listEntry>
+        </settingConfig>
+    </setting>
+
 </settings>

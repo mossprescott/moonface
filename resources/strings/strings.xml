@@ -10,4 +10,10 @@
     <string id="LocationOptionHamden">Hamden</string>
     <string id="LocationOptionNewOrleans">New Orleans</string>
 
+    <string id="ThemeTitle">Theme</string>
+    <string id="ThemeColorful">Colorful</string>
+    <string id="ThemeLight">Light</string>
+    <string id="ThemeDark">Dark</string>
+    <string id="ThemeAuto">Auto</string>
+
 </strings>

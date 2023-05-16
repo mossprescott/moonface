@@ -6,4 +6,5 @@
     <property id="ShowSeconds" type="boolean">false</property>
     <property id="ShowSPF" type="boolean">true</property>
     <property id="LocationOption" type="number">0</property>
+    <property id="Theme" type="number">0</property>
 </properties>
