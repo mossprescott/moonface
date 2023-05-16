@@ -15,7 +15,7 @@ const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 // A limit on the total amount of points to ever draw in a single cycle, to avoid
 // running into the execution time limit. No way to come up with a precise figure,
 // this is the result of a little trial and error.
-const MAX_PLOTTED as Number = 800;
+const MAX_PLOTTED as Number = 200;
 
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
 // JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
