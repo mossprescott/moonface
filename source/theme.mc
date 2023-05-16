@@ -17,6 +17,8 @@ module MFColors {
         var sun as ColorType;
         var moonIndicator as ColorType;
 
+        // TODO: some value(s) to bias the contrast of the moon
+
         function initialize(colors as Array<ColorType>) {
             sky = colors[0];
             below = colors[1];
@@ -64,4 +66,38 @@ module MFColors {
             /* moonInd */ Graphics.COLOR_LT_GRAY,
             ] as Array<ColorType>)
         );
+
+    const LightPalette as Palette = new Palette([
+        /* sky     */ Graphics.COLOR_WHITE,
+        /* below   */ Graphics.COLOR_WHITE,
+        /* index   */ Graphics.COLOR_BLACK,
+        /* compass */ Graphics.COLOR_DK_GRAY,
+        /* time    */ Graphics.COLOR_BLACK,
+        /* sun     */ 0xFFFF00,
+        /* moonInd */ Graphics.COLOR_LT_GRAY,
+    ] as Array<ColorType>);
+
+    const DarkPalette as Palette = new Palette([
+        /* sky     */ Graphics.COLOR_BLACK,
+        /* below   */ Graphics.COLOR_BLACK,
+        /* index   */ Graphics.COLOR_WHITE,
+        /* compass */ Graphics.COLOR_LT_GRAY,
+        /* time    */ Graphics.COLOR_WHITE,
+        /* sun     */ 0xFFFFAA,
+        /* moonInd */ Graphics.COLOR_LT_GRAY,
+    ] as Array<ColorType>);
+
+    // Black on white, all the time:
+    const Light as Theme = new Theme(
+        LightPalette,
+        null);
+
+    // White on Black, all the time:
+    const Dark as Theme = new Theme(
+        DarkPalette,
+        null);
+
+    const LightAndDark as Theme = new Theme(
+        LightPalette,
+        DarkPalette);
 }
