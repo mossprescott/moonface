@@ -79,7 +79,7 @@ module MFColors {
         /* compass */ Graphics.COLOR_DK_GRAY,
         /* time    */ Graphics.COLOR_BLACK,
         /* sun     */ 0xFFFF00,
-        /* moonInd */ Graphics.COLOR_LT_GRAY,
+        /* moonInd */ Graphics.COLOR_DK_GRAY,
     ] as Array<ColorType>);
 
     const DarkPalette as Palette = new Palette([
