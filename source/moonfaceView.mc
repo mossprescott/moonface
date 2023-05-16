@@ -140,20 +140,18 @@ class moonfaceView extends WatchUi.WatchFace {
             // Relatively fixed; changes only at sunrise/set
             drawDialBackground(dc, faceColor);
 
-            dc.setAntiAlias(true);
-
             // Draw indices, numerals, and the sun itself
             drawSunTrack(dc, sunrise, sunset, localNow);
 
             drawSunTrackOffDial(dc, location, Time.today(), indexColor);
 
+            dc.setAntiAlias(true);
             drawSun(dc, sunPosition.get(:azimuth) as Decimal, sunPosition.get(:altitude) as Decimal);
-
             dc.setAntiAlias(false);
+
             drawMoon(dc, moonPosition.get(:azimuth), moonPosition.get(:altitude),
                     moonPosition.get(:parallacticAngle),
                     moonIllumination.get(:fraction), moonIllumination.get(:phase));
-            dc.setAntiAlias(true);
         }
 
         // TODO: always draw the sun, because it can sometimes overlap the time when the moon is down during the day.
@@ -285,6 +283,8 @@ class moonfaceView extends WatchUi.WatchFace {
     }
 
     // Draw an index at the location of the sun at each hour of the day.
+    // Note: small circles render very slowly if anti-aliased, and very ugly if not. Squares look
+    // decent and render fast. Some kind of middle ground is probably possible.
     private function drawSunTrackOffDial(dc as Dc, loc as Location3, midnight as Moment, indexColor as ColorType) as Void {
         var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
 
@@ -295,8 +295,8 @@ class moonfaceView extends WatchUi.WatchFace {
             var pos = Orbits.sunPosition(t, loc);
             skyCalc.setPosition(pos.get(:azimuth), pos.get(:altitude));
             if (skyCalc.onscreen()) {
-                var r = h % 2 == 0 ? 2.0 : 1.0;
-                dc.fillCircle(skyCalc.x(), skyCalc.y(), r);
+                var r = h % 2 == 0 ? 3 : 2;
+                dc.fillRectangle(skyCalc.x()-r, skyCalc.y()-r, r*2-1, r*2-1);
             }
         }
     }
