@@ -34,7 +34,6 @@ class moonfaceView extends WatchUi.WatchFace {
     var location as Location3?;
 
     // Cache some state between draw calls:
-    var isMoonUp as Boolean = true;
     var isSunUp as Boolean = true;
     var frameCount as Number = 0;
 
@@ -113,10 +112,10 @@ class moonfaceView extends WatchUi.WatchFace {
         // Local time for display:
         var clockTime = System.getClockTime();
 
-        if (!secondsOnly) {
-            // UTC time for astronomical calculations:
-            var now = Time.now();
+        // UTC time for astronomical calculations:
+        var now = Time.now();
 
+        if (!secondsOnly) {
             // TODO: redraw only seconds when appropriate? Or request one update per minute?
 
             var sunTimes = Orbits.sunTimes(now, location);
@@ -124,14 +123,9 @@ class moonfaceView extends WatchUi.WatchFace {
             var sunset = localTimeOfDay(sunTimes.get(:set) as Moment);
 
             var sunPosition = Orbits.sunPosition(now, location);
-            var moonPosition = Orbits.moonPosition(now, location);
-            // TODO: don't recalculate the illumination every time since we only redraw periodically
-            var moonIllumination = Orbits.moonIllumination(now);
-            // System.println(moonIllumination);
 
             var localNow = localTimeOfDay(now);
             isSunUp = localNow >= sunrise && localNow <= sunset;
-            isMoonUp = (moonPosition.get(:altitude) as Decimal) >= 0;
 
             var indexColor = isSunUp ? Graphics.COLOR_BLACK : Graphics.COLOR_LT_GRAY;
 
@@ -148,19 +142,23 @@ class moonfaceView extends WatchUi.WatchFace {
             dc.setAntiAlias(true);
             drawSun(dc, sunPosition.get(:azimuth) as Decimal, sunPosition.get(:altitude) as Decimal);
             dc.setAntiAlias(false);
-
-            drawMoon(dc, moonPosition.get(:azimuth), moonPosition.get(:altitude),
-                    moonPosition.get(:parallacticAngle),
-                    moonIllumination.get(:fraction), moonIllumination.get(:phase));
         }
-
-        // TODO: always draw the sun, because it can sometimes overlap the time when the moon is down during the day.
 
         drawTime(dc, clockTime);
 
         // Indicating direction reference for what view of the sky we're dealing with.
         // Drawn after the time, which can overlap it slightly
         drawCompass(dc);
+
+        // The moon can overlap the time when it's low in the sky and close to full. And its
+        // drawing is optimized anyway, so almost always fast on "seconds" updates.
+        var moonPosition = Orbits.moonPosition(now, location);
+        // TODO: don't recalculate the illumination every time since we only redraw periodically
+        var moonIllumination = Orbits.moonIllumination(now);
+        // System.println(moonIllumination);
+        drawMoon(dc, moonPosition.get(:azimuth), moonPosition.get(:altitude),
+                moonPosition.get(:parallacticAngle),
+                moonIllumination.get(:fraction), moonIllumination.get(:phase));
 
         dc.setColor(Graphics.COLOR_WHITE, -1);
 
@@ -179,9 +177,6 @@ class moonfaceView extends WatchUi.WatchFace {
                 location.toString(),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
-
-        // Note: draw *after* the view's layout is rendered
-        // draw64ColorPalette(dc);
 
         var frameEnd = System.getTimer();
 
