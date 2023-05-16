@@ -294,8 +294,10 @@ class moonfaceView extends WatchUi.WatchFace {
             var t = midnight.add(new Duration(h*60*60));
             var pos = Orbits.sunPosition(t, loc);
             skyCalc.setPosition(pos.get(:azimuth), pos.get(:altitude));
-            var r = h % 2 == 0 ? 2.0 : 1.0;
-            dc.fillCircle(skyCalc.x(), skyCalc.y(), r);
+            if (skyCalc.onscreen()) {
+                var r = h % 2 == 0 ? 2.0 : 1.0;
+                dc.fillCircle(skyCalc.x(), skyCalc.y(), r);
+            }
         }
     }
 
