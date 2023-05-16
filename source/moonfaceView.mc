@@ -298,6 +298,13 @@ class moonfaceView extends WatchUi.WatchFace {
 
         var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
 
+        var horizon = palette.horizon;
+        if (horizon != null) {
+            dc.setColor(horizon, COLOR_NONE);
+            var y = dc.getHeight()/2 - 1;
+            dc.drawLine(0, y, dc.getWidth(), y);
+        }
+
         dc.setColor(palette.compass, COLOR_NONE);
 
         skyCalc.setPosition(EAST, 0.0);

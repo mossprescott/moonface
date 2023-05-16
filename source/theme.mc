@@ -7,6 +7,7 @@ module MFColors {
         // Backgrounds:
         var sky as ColorType;
         var below as ColorType;
+        var horizon as ColorType?;
 
         // Foregrounds:
         var index as ColorType;
@@ -19,14 +20,15 @@ module MFColors {
 
         // TODO: some value(s) to bias the contrast of the moon
 
-        function initialize(colors as Array<ColorType>) {
+        function initialize(colors as Array<ColorType?>) {
             sky = colors[0];
             below = colors[1];
-            index = colors[2];
-            compass = colors[3];
-            time = colors[4];
-            sun = colors[5];
-            moonIndicator = colors[6];
+            horizon = colors[2];
+            index = colors[3];
+            compass = colors[4];
+            time = colors[5];
+            sun = colors[6];
+            moonIndicator = colors[7];
         }
     }
 
@@ -50,26 +52,29 @@ module MFColors {
         new Palette([
             /* sky     */ 0x0055AA,
             /* below   */ 0x550055,
+            /* horizon */ null,
             /* index   */ Graphics.COLOR_BLACK,
             /* compass */ Graphics.COLOR_LT_GRAY,
             /* time    */ Graphics.COLOR_WHITE,
             /* sun     */ 0xFFFFAA,
             /* moonInd */ Graphics.COLOR_LT_GRAY,
-            ] as Array<ColorType>),
+            ] as Array<ColorType?>),
         new Palette([
             /* sky     */ Graphics.COLOR_BLACK,
             /* below   */ 0x550055,
+            /* horizon */ null,
             /* index   */ Graphics.COLOR_LT_GRAY,
             /* compass */ Graphics.COLOR_LT_GRAY,
             /* time    */ Graphics.COLOR_WHITE,
             /* sun     */ 0xFFFFAA,
             /* moonInd */ Graphics.COLOR_LT_GRAY,
-            ] as Array<ColorType>)
+            ] as Array<ColorType?>)
         );
 
     const LightPalette as Palette = new Palette([
         /* sky     */ Graphics.COLOR_WHITE,
         /* below   */ Graphics.COLOR_WHITE,
+        /* horizon */ Graphics.COLOR_LT_GRAY,
         /* index   */ Graphics.COLOR_BLACK,
         /* compass */ Graphics.COLOR_DK_GRAY,
         /* time    */ Graphics.COLOR_BLACK,
@@ -80,6 +85,7 @@ module MFColors {
     const DarkPalette as Palette = new Palette([
         /* sky     */ Graphics.COLOR_BLACK,
         /* below   */ Graphics.COLOR_BLACK,
+        /* horizon */ Graphics.COLOR_DK_GRAY,
         /* index   */ Graphics.COLOR_WHITE,
         /* compass */ Graphics.COLOR_LT_GRAY,
         /* time    */ Graphics.COLOR_WHITE,
