@@ -144,7 +144,7 @@ class moonfaceView extends WatchUi.WatchFace {
             drawDialBackground(dc);
 
             // Draw indices, numerals, and the sun itself
-            drawSunTrack(dc, sunrise, sunset, localNow);
+            // drawSunTrack(dc, sunrise, sunset, localNow);
 
             drawSunTrackOffDial(dc, location, Time.today());
 
@@ -232,44 +232,44 @@ class moonfaceView extends WatchUi.WatchFace {
             Graphics.TEXT_JUSTIFY_CENTER|Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    // Note: all "times" are local, in hours. That is, noon has the value 12.0,
-    // and midnight is 0.0 (or equivalently, 24.0).
-    private function drawSunTrack(dc as Dc, sunrise as Float, sunset as Float, current as Float) as Void {
-        var width = dc.getWidth();
-        var height = dc.getHeight();
-        var calc = new DialCalculator(width, height);
-        calc.setSunTimes(sunrise, sunset);
+    // // Note: all "times" are local, in hours. That is, noon has the value 12.0,
+    // // and midnight is 0.0 (or equivalently, 24.0).
+    // private function drawSunTrack(dc as Dc, sunrise as Float, sunset as Float, current as Float) as Void {
+    //     var width = dc.getWidth();
+    //     var height = dc.getHeight();
+    //     var calc = new DialCalculator(width, height);
+    //     calc.setSunTimes(sunrise, sunset);
 
-        for (var h = 0; h < 24; h += 1) {
-            calc.setValue(h as Float);
-            dc.setColor(palette.index, COLOR_NONE);
+    //     for (var h = 0; h < 24; h += 1) {
+    //         calc.setValue(h as Float);
+    //         dc.setColor(palette.index, COLOR_NONE);
 
-            if (h % 2 == 0) {
-                calc.setRadius(0.90);
-                if (calc.y() <= height/2 + 10) {
-                    dc.drawText(calc.x(), calc.y(), Graphics.FONT_GLANCE, formatHourString(h),
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                }
-            }
+    //         if (h % 2 == 0) {
+    //             calc.setRadius(0.90);
+    //             if (calc.y() <= height/2 + 10) {
+    //                 dc.drawText(calc.x(), calc.y(), Graphics.FONT_GLANCE, formatHourString(h),
+    //                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    //             }
+    //         }
 
-            // TEMP:
-            // calc.setRadius(0.95);
-            // dc.fillCircle(calc.x(), calc.y(), 1.5);
-        }
+    //         // TEMP:
+    //         // calc.setRadius(0.95);
+    //         // dc.fillCircle(calc.x(), calc.y(), 1.5);
+    //     }
 
-        // TEMP: don't draw the sun at the edge of the dial for now. Maybe replace it with some
-        // other indicator later?
-    //     calc.setValue(current);
-    //     calc.setRadius(1.0);
-    //     var r = width/15;  // puts the
-    //     dc.setColor(COLOR_SUN, COLOR_NONE);
-    //     dc.drawCircle(calc.x(), calc.y(), r);
-    //    // if (calc.isDay()) {
-    //     dc.setClip(0, 0, width, height/2);
-    //         dc.fillCircle(calc.x(), calc.y(), r);
-    //     dc.clearClip();
-       // }
-    }
+    //     // TEMP: don't draw the sun at the edge of the dial for now. Maybe replace it with some
+    //     // other indicator later?
+    // //     calc.setValue(current);
+    // //     calc.setRadius(1.0);
+    // //     var r = width/15;  // puts the
+    // //     dc.setColor(COLOR_SUN, COLOR_NONE);
+    // //     dc.drawCircle(calc.x(), calc.y(), r);
+    // //    // if (calc.isDay()) {
+    // //     dc.setClip(0, 0, width, height/2);
+    // //         dc.fillCircle(calc.x(), calc.y(), r);
+    // //     dc.clearClip();
+    //    // }
+    // }
 
     // Draw an index at the location of the sun at each hour of the day.
     // Note: small circles render very slowly if anti-aliased, and very ugly if not. Squares look
@@ -284,8 +284,17 @@ class moonfaceView extends WatchUi.WatchFace {
             var pos = Orbits.sunPosition(t, loc);  // Note: lots of time here. Cache them?
             skyCalc.setPosition(pos.get(:azimuth), pos.get(:altitude));
             if (skyCalc.onscreen()) {
-                var r = h % 2 == 0 ? 3 : 2;
-                dc.fillRectangle(skyCalc.x()-r, skyCalc.y()-r, r*2-1, r*2-1);
+                if (h%6 == 0) {
+                    // 6, 12, and 18
+                    // Quick and dirty rect with corners knocked out:
+                    dc.fillRectangle(skyCalc.x()-4, skyCalc.y()-3, 4*2-1, 3*2-1);
+                    dc.fillRectangle(skyCalc.x()-3, skyCalc.y()-4, 3*2-1, 4*2-1);
+                }
+                else {
+                    var r = h%3 == 0 ? 3 : 2;
+                    dc.fillRectangle(skyCalc.x()-r, skyCalc.y()-r, r*2-1, r*2-1);
+                }
+
             }
         }
     }
