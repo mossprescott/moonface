@@ -6,15 +6,7 @@ import Toybox.Position;
 import Toybox.System;
 import Toybox.Time;
 import Toybox.WatchUi;
-
-const COLOR_DAY_SKY as ColorType = 0x0055AA;
-const COLOR_NIGHT_SKY as ColorType = 0x000000;
-const COLOR_UNDERWORLD as ColorType = 0x550055;
-
-const COLOR_DAY_FG as ColorType = 0x000000;
-const COLOR_NIGHT_FG as ColorType = 0xFFFFFF;
-
-const COLOR_SUN as ColorType = 0xFFFFAA;
+using MFColors;
 
 const COLOR_NONE as ColorType = -1;
 
@@ -31,16 +23,23 @@ class moonfaceView extends WatchUi.WatchFace {
 
     var moonBuffer as MoonBuffer;
 
+    var theme as MFColors.Theme;
+
     var location as Location3?;
 
     // Cache some state between draw calls:
     var isSunUp as Boolean = true;
+    var palette as MFColors.Palette;
     var frameCount as Number = 0;
 
     function initialize() {
         WatchFace.initialize();
 
         moonBuffer = new MoonBuffer(MOON_UP_RADIUS);
+
+        // TODO:
+        theme = MFColors.Colorful;
+        palette = theme.day;
     }
 
     // Load your resources here
@@ -126,18 +125,15 @@ class moonfaceView extends WatchUi.WatchFace {
 
             var localNow = localTimeOfDay(now);
             isSunUp = localNow >= sunrise && localNow <= sunset;
-
-            var indexColor = isSunUp ? Graphics.COLOR_BLACK : Graphics.COLOR_LT_GRAY;
-
-            var faceColor = isSunUp ? COLOR_DAY_SKY : COLOR_NIGHT_SKY;
+            palette = isSunUp ? theme.day : theme.night;
 
             // Relatively fixed; changes only at sunrise/set
-            drawDialBackground(dc, faceColor);
+            drawDialBackground(dc);
 
             // Draw indices, numerals, and the sun itself
             drawSunTrack(dc, sunrise, sunset, localNow);
 
-            drawSunTrackOffDial(dc, location, Time.today(), indexColor);
+            drawSunTrackOffDial(dc, location, Time.today());
 
             dc.setAntiAlias(true);
             drawSun(dc, sunPosition.get(:azimuth) as Decimal, sunPosition.get(:altitude) as Decimal);
@@ -160,7 +156,7 @@ class moonfaceView extends WatchUi.WatchFace {
                 moonPosition.get(:parallacticAngle),
                 moonIllumination.get(:fraction), moonIllumination.get(:phase));
 
-        dc.setColor(Graphics.COLOR_WHITE, -1);
+        dc.setColor(palette.time, -1);
 
         // One complication under the time
         // TODO: make it a setting
@@ -186,7 +182,7 @@ class moonfaceView extends WatchUi.WatchFace {
     }
 
     private function drawSPF(dc as Dc, start as Number, end as Number) as Void {
-        dc.setColor(Graphics.COLOR_WHITE, -1);
+        dc.setColor(palette.time, -1);
         dc.drawText(dc.getWidth()/2, dc.getHeight()-10, Graphics.FONT_XTINY,
             Lang.format("$1$ms", [end - start]),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -199,16 +195,13 @@ class moonfaceView extends WatchUi.WatchFace {
 
 
 
-    private function drawDialBackground(dc as Dc, faceColor as ColorType) as Void {
+    private function drawDialBackground(dc as Dc) as Void {
         var width = dc.getWidth();
         var height = dc.getHeight();
 
-        dc.setColor(faceColor, COLOR_UNDERWORLD);
+        dc.setColor(palette.sky, palette.below);
         dc.clear();
         dc.fillRectangle(0, 0, width, height/2);
-
-        // dc.setColor(faceColor, COLOR_UNDERWORLD);
-        // dc.fillCircle(width/2, height/2, width/2 - TRACK_WIDTH);
     }
 
     // Draw the current time, either above or below the horizon depending on whether the moon is up.
@@ -220,17 +213,8 @@ class moonfaceView extends WatchUi.WatchFace {
 
         var timeString = getLocalTimeString(clockTime);
 
-        var timeY;
-        var bgColor;
-        // if (isMoonUp) {
-            timeY = 37;  // FIXME: needs scaling for font size
-            bgColor = COLOR_UNDERWORLD;
-        // }
-        // else {
-        //     timeY = -30;  // FIXME: needs scaling for font size
-        //     bgColor = isSunUp ? COLOR_DAY_SKY : COLOR_NIGHT_SKY;
-        // }
-        dc.setColor(Graphics.COLOR_WHITE, bgColor);
+        var timeY = 37;  // FIXME: needs scaling for font size
+        dc.setColor(palette.time, palette.below);
         dc.drawText(width/2, height/2 + timeY, Graphics.FONT_NUMBER_MEDIUM, timeString,
             Graphics.TEXT_JUSTIFY_CENTER|Graphics.TEXT_JUSTIFY_VCENTER);
     }
@@ -243,12 +227,9 @@ class moonfaceView extends WatchUi.WatchFace {
         var calc = new DialCalculator(width, height);
         calc.setSunTimes(sunrise, sunset);
 
-        calc.setValue(current);
-        var isDay = calc.isDay();
-
         for (var h = 0; h < 24; h += 1) {
             calc.setValue(h as Float);
-            dc.setColor(isDay ? Graphics.COLOR_BLACK : Graphics.COLOR_LT_GRAY, COLOR_NONE);
+            dc.setColor(palette.index, COLOR_NONE);
 
             if (h % 2 == 0) {
                 calc.setRadius(0.90);
@@ -280,14 +261,14 @@ class moonfaceView extends WatchUi.WatchFace {
     // Draw an index at the location of the sun at each hour of the day.
     // Note: small circles render very slowly if anti-aliased, and very ugly if not. Squares look
     // decent and render fast. Some kind of middle ground is probably possible.
-    private function drawSunTrackOffDial(dc as Dc, loc as Location3, midnight as Moment, indexColor as ColorType) as Void {
+    private function drawSunTrackOffDial(dc as Dc, loc as Location3, midnight as Moment) as Void {
         var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
 
-        dc.setColor(indexColor, COLOR_NONE);
+        dc.setColor(palette.index, COLOR_NONE);
 
         for (var h = 0; h < 24; h += 1) {
             var t = midnight.add(new Duration(h*60*60));
-            var pos = Orbits.sunPosition(t, loc);
+            var pos = Orbits.sunPosition(t, loc);  // Note: lots of time here. Cache them?
             skyCalc.setPosition(pos.get(:azimuth), pos.get(:altitude));
             if (skyCalc.onscreen()) {
                 var r = h % 2 == 0 ? 3 : 2;
@@ -304,7 +285,7 @@ class moonfaceView extends WatchUi.WatchFace {
 
         var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
 
-        dc.setColor(Graphics.COLOR_LT_GRAY, COLOR_NONE);
+        dc.setColor(palette.compass, COLOR_NONE);
 
         skyCalc.setPosition(EAST, 0.0);
         dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
@@ -341,7 +322,7 @@ class moonfaceView extends WatchUi.WatchFace {
         var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
         skyCalc.setPosition(azimuth, altitude);
 
-        dc.setColor(COLOR_SUN, COLOR_NONE);
+        dc.setColor(palette.sun, COLOR_NONE);
         if (skyCalc.onscreen()) {
             if (altitude >= 0) {
                 dc.fillCircle(skyCalc.x(), skyCalc.y(), 5);
@@ -373,7 +354,7 @@ class moonfaceView extends WatchUi.WatchFace {
             }
         }
         else {
-            dc.setColor(Graphics.COLOR_LT_GRAY, -1);
+            dc.setColor(palette.moonIndicator, COLOR_NONE);
             drawOffscreenIndicator(dc, skyCalc, 6);
         }
     }
@@ -389,24 +370,24 @@ class moonfaceView extends WatchUi.WatchFace {
         }
     }
 
-    private function draw64ColorPalette(dc as Dc) as Void {
-        var s = 8;
+    // private function draw64ColorPalette(dc as Dc) as Void {
+    //     var s = 8;
 
-        for (var z = 0; z < 4; z += 1) {
-        for (var x = 0; x < 4; x += 1) {
-        for (var y = 0; y < 4; y += 1) {
-            var color = ((z * 85) << 16)  // red: a whole square for each level
-                      + ((x * 85) << 8)   // green: a column for each level
-                       + (y * 85);        // blue: a row for each level
-            // color = Graphics.COLOR_LT_GRAY;
-            dc.setColor(color, Graphics.COLOR_BLACK);
-            var x0 = 130 - 2*s*5 + z*s*5;
-            var y0 = 150;
-            dc.fillRectangle(x0 + x*s, y0 + y*s, s, s);
-        }
-        }
-        }
-    }
+    //     for (var z = 0; z < 4; z += 1) {
+    //     for (var x = 0; x < 4; x += 1) {
+    //     for (var y = 0; y < 4; y += 1) {
+    //         var color = ((z * 85) << 16)  // red: a whole square for each level
+    //                   + ((x * 85) << 8)   // green: a column for each level
+    //                    + (y * 85);        // blue: a row for each level
+    //         // color = Graphics.COLOR_LT_GRAY;
+    //         dc.setColor(color, Graphics.COLOR_BLACK);
+    //         var x0 = 130 - 2*s*5 + z*s*5;
+    //         var y0 = 150;
+    //         dc.fillRectangle(x0 + x*s, y0 + y*s, s, s);
+    //     }
+    //     }
+    //     }
+    // }
 
 
     private function getLocalTimeString(clockTime as ClockTime) as String {
