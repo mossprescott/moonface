@@ -15,7 +15,7 @@ const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 // A limit on the total amount of points to ever draw in a single cycle, to avoid
 // running into the execution time limit. No way to come up with a precise figure,
 // this is the result of a little trial and error.
-const MAX_PLOTTED as Number = 150;
+const MAX_PLOTTED as Number = 600;
 
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
 // JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
@@ -57,67 +57,40 @@ class MoonPixels {
                          fromRow as Number?) as Number? {
         // TODO: uh, dither?
 
-        // var HALF_OPAQUE = false;
-
-        var cos = Math.cos(-parallacticAngle);
-        var sin = Math.sin(-parallacticAngle);
-        var scale = (SIZE/2)/radius;
-        var rsq = radius*radius;
-
-        // Half the minor axis of an ellipse defining the edge of the illuminated part of the moon.
-        // Note: I suspect an ellipse isn't actually quite the correct shape, but at this resolution
-        // it's probably close enough.
-        var a;
-        if (illuminationFraction < 0.5) {
-            // Just trying the get this approximately realistic:
-            // - some sliver of the moon visible except within ~24 hours of the new moon.
-            a = (SIZE/2 - 4)*(1 - 2*illuminationFraction);
-            // System.println(Lang.format("a: $1$", [a]));
-        } else {
-            a = (SIZE/2 - 4)*(2*illuminationFraction - 1);
-            // System.println(Lang.format("(-)a: $1$", [a]));
-        }
-        var drawRight = phase <= 0.5;
-        var drawCenter = 0.25 < phase and phase < 0.75;  // ?
-        var drawLeft = phase >= 0.5;
-        // System.println(Lang.format("$1$; $2$; $3$", [drawLeft, drawCenter, drawRight]));
-
-        var b = SIZE/2;
-        var asq = a*a;
-        var bsq = b*b;
-        var absq = asq*bsq;
+        var calc = new MoonFaceCalculator(radius, parallacticAngle, illuminationFraction, phase);
 
         var lastColor = 0xFFFFFF;
         var plottedCount = 0;
 
         var startRow = fromRow != null ? fromRow : -radius;
         for (var y = startRow; y <= radius; y += 1) {
-            for (var x = -radius; x <= radius; x += 1) {
+            calc.setRow(y);
+
+            // TODO: each row must have some pixels at either left or right edge, possibly both.
+            // Start at each end and go until a non-illuminated pixel is found, or all pixels are
+            // seen.
+            // var left = calc.illuminated(calc.minX);
+            // var right = calc.illuminated(calc.maxX);
+            // System.println(Lang.format("$1$; $2$: $3$; $4$: $5$", [y, calc.minX, left, calc.maxX, right]));
+
+            var drewSome = false;
+
+            for (var x = calc.minX; x <= calc.maxX; x += 1) {
                 var val;
-                // if (HALF_OPAQUE and (y+x)&1 == 0) {
-                //     continue;
-                // }
-                //else
-                if (y*y + x*x > rsq) {
-                    // Skip some calculation; the point is clearly outside the disk
-                    continue;
+
+                // TEMP: count every pixel we look at
+                plottedCount += 1;
+
+                if (!calc.illuminated(x)) {
+                    if (drewSome) { break; } // HACK: assume only one segment per row
+                    else { continue; }
+                }
+                else {
+                    // drewSome = true;
                 }
 
-                // Note: could save some multiplication by computing dx and dy once at
-                // start of each row. But that's probably not where the time is at the moment.
-                var mx = (x*cos - y*sin)*scale;
-                var my = (x*sin + y*cos)*scale;
-
-                // Is this pixel towards the center of the moon's image, relative to the ellipse
-                // that defines the edge of the illuminated area?
-                var inside = bsq*mx*mx + asq*my*my < absq;
-                if (inside) {
-                    if (!drawCenter) { continue; }
-                }
-                else if ((mx < 0 and !drawLeft) or (mx > 0 and !drawRight)) { continue; }
-
-                // TOD0: round/interpolate?
-                val = getRectangular(mx.toNumber(), my.toNumber());  // 16ms
+                // TODO: round/interpolate?
+                val = getRectangular(calc.mx.toNumber(), calc.my.toNumber());  // 16ms
                 if (val != null) {
                     var color;
                     if (val > 0.75) {
@@ -138,16 +111,12 @@ class MoonPixels {
                         lastColor = color;
                     }
                     dc.drawPoint(centerX + x, centerY + y);      // 7ms
-                    plottedCount += 1;
+                    // plottedCount += 1;
 
                     if (plottedCount >= MAX_PLOTTED) {
                         System.println(Lang.format("Aborting drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
                         return y;
                     }
-                    // else if (!HALF_OPAQUE and plottedCount > MAX_PLOTTED*0.60) {
-                    //     System.println(Lang.format("Switching to 50% drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
-                    //     HALF_OPAQUE = true;
-                    // }
                 }
             }
         }
@@ -204,6 +173,123 @@ class MoonPixels {
         }
     }
 }
+
+// Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase
+// of the moon.
+//
+// Note: there's overhead in the VM to access object fields, as well as to call the methods,
+// but hopefully this will allow for an improved algorithm (i.e. binary search).
+class MoonFaceCalculator {
+    // var radius as Number;
+    // var parallacticAngle as Decimal;
+    // var illuminationFraction as Decimal;
+    // var phase as Decimal;
+
+    private var t11 as Float;
+    private var t21 as Float;
+    private var rsq as Float;
+
+    private var drawRight as Boolean;
+    private var drawCenter as Boolean;
+    private var drawLeft as Boolean;
+
+    private var asq as Float;
+    private var bsq as Float;
+    private var absq as Float;
+
+    private var y as Number;
+    // private var x as Number;
+
+    //
+    // Visible to the caller:
+    //
+
+    // Coords of the current point, in image space:
+    public var mx as Float;
+    public var my as Float;
+
+    // Minumum and maximum x-coords for the row, based on the circular disk only (not the current phase):
+    public var minX as Number;
+    public var maxX as Number;
+
+    function initialize(radius as Number, parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) {
+        var scale = (SIZE/2)/radius.toFloat();
+        t11 = (Math.cos(-parallacticAngle)*scale).toFloat();
+        t21 = (Math.sin(-parallacticAngle)*scale).toFloat();
+        rsq = (radius*radius).toFloat();
+
+        // Half the minor axis of an ellipse defining the edge of the illuminated part of the moon.
+        // Note: I suspect an ellipse isn't actually quite the correct shape, but at this resolution
+        // it's probably close enough.
+        var a;
+        if (illuminationFraction < 0.5) {
+            // Just trying the get this approximately realistic:
+            // - some sliver of the moon visible except within ~24 hours of the new moon.
+            a = (SIZE/2 - 4)*(1 - 2*illuminationFraction);
+            // System.println(Lang.format("a: $1$", [a]));
+        } else {
+            a = (SIZE/2 - 4)*(2*illuminationFraction - 1);
+            // System.println(Lang.format("(-)a: $1$", [a]));
+        }
+        drawRight = phase <= 0.5;
+        drawCenter = 0.25 < phase and phase < 0.75;  // ?
+        drawLeft = phase >= 0.5;
+        // System.println(Lang.format("$1$; $2$; $3$", [drawLeft, drawCenter, drawRight]));
+
+        var b = SIZE/2;
+        asq = (a*a).toFloat();
+        bsq = (b*b).toFloat();
+        absq = asq*bsq;
+
+        y = 0;
+        mx = 0.0;
+        my = 0.0;
+        minX = 0;
+        maxX = 0;
+    }
+
+    function setRow(y as Number) as Void {
+        self.y = y;
+
+        // Note: effectively, truncating the real value to an int seems to force it to lie
+        // within the disk.
+        maxX = Math.sqrt(rsq - y*y).toNumber();
+        minX = -maxX;
+    }
+
+    // True if the pixel at (x, y) needs to be drawn. After this call, (mx, my) contains
+    // image-space coords.
+    function illuminated(x as Number) as Boolean {
+        // This check is redundant if minX and maxX are used.
+        // if (y*y + x*x > rsq) {
+        //     // Skip some calculation; the point is clearly outside the disk
+        //     return false;
+        // }
+
+        // Note: could save some multiplication by computing dx and dy once at
+        // start of each row. But that's probably not where the time is at the moment.
+        mx = x*t11 - y*t21;
+        my = x*t21 + y*t11;
+
+        // Is this pixel towards the center of the moon's image, relative to the ellipse
+        // that defines the edge of the illuminated area?
+        var inside = bsq*mx*mx + asq*my*my < absq;
+        if (inside) {
+            if (!drawCenter) {
+                return false;
+            }
+        }
+        else {
+            if (mx < 0 and !drawLeft) {
+                return false;
+            }
+            else if (mx > 0 and !drawRight) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
 (:test)
 function testGetOne(logger as Logger) as Boolean {
