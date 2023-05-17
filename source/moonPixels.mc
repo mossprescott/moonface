@@ -31,19 +31,10 @@ class MoonPixels {
     // TODO: interpolate?
     // Result is between 0 and 1, or null if the point is outside the disk.
     public function getPolar(r as Decimal, theta as Decimal) as Decimal? {
-        var y = Math.round(64*r*Math.sin(theta)).toNumber();
-        var x = Math.round(64*r*Math.cos(theta)).toNumber();
+        var y = Math.round((SIZE/2)*r*Math.sin(theta)).toNumber();
+        var x = Math.round((SIZE/2)*r*Math.cos(theta)).toNumber();
         return getRectangular(x, y);
     }
-
-    // // Get the brightness at some location.
-    // // TODO: interpolate?
-    // // Result is between 0 and 1, or null if the point is outside the disk.
-    // public function getPolar(r as Decimal, theta as Decimal) as Decimal? {
-    //     var y = Math.round((SIZE/2)*r*Math.sin(theta)).toNumber();
-    //     var x = Math.round((SIZE/2)*r*Math.cos(theta)).toNumber();
-    //     return getRectangular(x, y);
-    // }
 
     // Draw some rows of the moon's face, at the given location and size, as specified by angle,
     // fraction, and phase.
