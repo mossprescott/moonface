@@ -46,15 +46,15 @@ class MoonPixels {
     public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number,
                          parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal,
                          fromRow as Number?) as Number? {
-        // TODO: uh, dither?
 
+        var writer = new MoonPixelRowWriter(dc, centerX, centerY, radius);
         var calc = new MoonFaceCalculator(radius, parallacticAngle, illuminationFraction, phase);
-
-        var lastColor = 0xFFFFFF;
         var plottedCount = 0;
 
         var startRow = fromRow != null ? fromRow : -radius;
         for (var y = startRow; y <= radius; y += 1) {
+            writer.setRow(y);
+
             calc.setRow(y);
 
             // TODO: each row must have some pixels at either left or right edge, possibly both.
@@ -67,46 +67,20 @@ class MoonPixels {
             var drewSome = false;
 
             for (var x = calc.minX; x <= calc.maxX; x += 1) {
-                var val;
-
                 // TEMP: count every pixel we look at
                 plottedCount += 1;
 
-                if (!calc.illuminated(x)) {
-                    if (drewSome) { break; } // HACK: assume only one segment per row
-                    else { continue; }
-                }
-                else {
-                    // drewSome = true;
-                }
+                if (calc.illuminated(x)) {
+                    // TODO: round/interpolate?
+                    var val = getRectangular(calc.mx.toNumber(), calc.my.toNumber());  // 16ms
+                    if (val != null) {
+                        writer.setPixel(x, val);
+                        // plottedCount += 1;
 
-                // TODO: round/interpolate?
-                val = getRectangular(calc.mx.toNumber(), calc.my.toNumber());  // 16ms
-                if (val != null) {
-                    var color;
-                    if (val > 0.75) {
-                        color = 0xFFFFFF;  // white
-                    }
-                    else if (val > 0.50) {
-                        color = 0xAAAAAA;  // light gray
-                    }
-                    else if (val > 0.25) {
-                        color = 0x555555;  // dark gray
-                    }
-                    else {
-                        color = 0x000000;  // black
-                    }
-                    // Note: setColor takes ~10% of the time, so avoid it when it's redundant:
-                    if (color != lastColor) {
-                        dc.setColor(color, -1);  // 4ms
-                        lastColor = color;
-                    }
-                    dc.drawPoint(centerX + x, centerY + y);      // 7ms
-                    // plottedCount += 1;
-
-                    if (plottedCount >= MAX_PLOTTED) {
-                        System.println(Lang.format("Aborting drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
-                        return y;
+                        if (plottedCount >= MAX_PLOTTED) {
+                            System.println(Lang.format("Aborting drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
+                            return y;
+                        }
                     }
                 }
             }
@@ -163,6 +137,55 @@ class MoonPixels {
             return raw / local_MAX_VALUE;
         }
     }
+}
+
+// Collect values for a row of pixels at a time, so they can (eventually) be written as a batch.
+//
+// TODO: encapsulate dithering state here; the same instance should be used to write one row,
+// then advanced to the next.
+class MoonPixelRowWriter {
+    private var dc as Graphics.Dc;
+    private var centerX as Number;
+    private var centerY as Number;
+    private var radius as Number;
+
+    private var y as Number = 0;
+    private var lastColor as ColorType = -1;
+
+    function initialize(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number) {
+        self.dc = dc;
+        self.centerX = centerX;
+        self.centerY = centerY;
+        self.radius = radius;
+    }
+
+    function setRow(y as Number) as Void {
+        self.y = y;
+    }
+
+    function setPixel(x as Number, val as Float) as Void {
+        var color;
+        if (val > 0.75) {
+            color = 0xFFFFFF;  // white
+        }
+        else if (val > 0.50) {
+            color = 0xAAAAAA;  // light gray
+        }
+        else if (val > 0.25) {
+            color = 0x555555;  // dark gray
+        }
+        else {
+            color = 0x000000;  // black
+        }
+        // Note: setColor takes ~10% of the time, so avoid it when it's redundant:
+        if (color != lastColor) {
+            dc.setColor(color, -1);  // 4ms
+            lastColor = color;
+        }
+        dc.drawPoint(centerX + x, centerY + y);      // 7ms
+    }
+
+    // TODO: function commitRow()
 }
 
 // Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase
@@ -281,6 +304,7 @@ class MoonFaceCalculator {
 
         return true;
     }
+}
 
 (:test)
 function testGetOne(logger as Logger) as Boolean {
