@@ -451,7 +451,7 @@ class MoonBuffer {
     var pixelData as MoonPixels;
 
     // Strong reference, keeps the buffer in memory once it's created.
-    var bitmap as BufferedBitmap?;
+    var savedBitmap as BufferedBitmap?;
 
     // Radius of previous drawing in the buffer.
     var savedRadius as Number?;
@@ -470,7 +470,11 @@ class MoonBuffer {
     }
 
     function draw(dc as Dc, x as Number, y as Number, radius as Number, angle as Decimal, fraction as Decimal, phase as Decimal) as Void {
-        if (bitmap == null) {
+        var bitmap;
+        if (savedBitmap != null) {
+            bitmap = savedBitmap;
+        }
+        else {
             //Test.assert(Graphics has :createBufferedBitmap);
             var ref = Graphics.createBufferedBitmap({
                 :width => maxRadius*2, :height => maxRadius*2,
@@ -479,6 +483,7 @@ class MoonBuffer {
                 // :palette => [0x000000, 0xFFFFFF] as Array<ColorType>
             });
             bitmap = ref.get() as BufferedBitmap;
+            savedBitmap = bitmap;
         }
 
         var ALWAYS_DRAW = false;
