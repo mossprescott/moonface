@@ -31,6 +31,6 @@ class Throttle {
 
     (:notSimulator)
     private function maxUpdateMillis() as Number {
-        return 250;
+        return 500;
     }
 }
