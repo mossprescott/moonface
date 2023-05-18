@@ -25,7 +25,7 @@ Note: that approach doesn't actually save any power; it's just working around th
 constraints.
 
 Once a complete image is assembled, it's stored offscreen and re-used for several minutes,
-until some rotation will have occurred and then a new image is be generated. Similar savings
+until some rotation will have occurred and then a new image is generated. Similar savings
 could be achieved by also caching the background with the hour indices in another offscreen buffer,
 but it would consume a lot more memory (from the Graphics pool.)
 
