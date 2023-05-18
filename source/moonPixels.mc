@@ -93,13 +93,13 @@ class MoonPixels {
                 }
             }
 
-            // writer.commitRow();  // Will need this when/if there's any per-row state to maintain
+            writer.commitRow();
 
             // Check the remaining execution time budget after each row. Using the actual clock
             // hopefully means that we can draw as much as possible in any given frame, depending
             // on what other work might have been done. But always leave some margin for any
             // other tasks that are going to follow.
-            if (moonfaceApp.throttle.getRemainingTime() < 0.2) {
+            if (moonfaceApp.throttle.getRemainingTime() < 0.33) {
                 System.println(Lang.format("Aborting drawing at row $1$ (radius: $2$) (out of time)", [y, radius]));
                 return y;
             }
@@ -164,49 +164,103 @@ class MoonPixelRowWriter {
     private var dc as Graphics.Dc;
     private var centerX as Number;
     private var centerY as Number;
-    // private var radius as Number;
+    private var radius as Number;
 
     private var y as Number = 0;
+    private var values as Array<Float?>;
+    private var errors as Array<Float?>;
     private var lastColor as ColorType = -1;
 
     function initialize(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number) {
         self.dc = dc;
         self.centerX = centerX;
         self.centerY = centerY;
-        // self.radius = radius;
+        self.radius = radius;
+
+        values = new Array<Float?>[2*(radius+1)];
+        errors = new Array<Float?>[2*(radius+2)];
     }
 
     function setRow(y as Number) as Void {
         self.y = y;
-    }
-
-    function setPixel(x as Number, val as Float?) as Void {
-        if (val != null) {
-            var color;
-            if (val > 0.75) {
-                color = 0xFFFFFF;  // white
-            }
-            else if (val > 0.50) {
-                color = 0xAAAAAA;  // light gray
-            }
-            else if (val > 0.25) {
-                color = 0x555555;  // dark gray
-            }
-            else {
-                color = 0x000000;  // black
-            }
-
-            // Note: setColor takes ~10% of the time, so avoid it when it's redundant:
-            if (color != lastColor) {
-                dc.setColor(color, -1);
-                lastColor = color;
-            }
-
-            dc.drawPoint(centerX + x, centerY + y);
+        for (var i = 0; i < values.size(); i += 1) {
+            values[i] = null;
         }
     }
 
-    // TODO: function commitRow()
+    function setPixel(x as Number, val as Float?) as Void {
+        values[radius+x] = val;
+    }
+
+    function commitRow() as Void {
+        // Error diffused to the next pixel to the right.
+        var nextError = consumeError(-radius);
+
+        // Note: any error that gets diffused to a pixel that doesn't have a value
+        // just gets ignored. That means the image has sharp boundaries, but some
+        // contrast might be lost. In theory, that error could be attributed to
+        // the nearest illuminated pixel, but probably it's not noticeable anyway.
+
+        for (var x = -radius; x <= radius; x += 1) {
+            var val = values[radius + x];
+            if (val != null) {
+                val += nextError;
+
+                var color;
+                var error;
+                if (val > 0.75) {
+                    color = 0xFFFFFF;  // white
+                    error = val - 1;
+                }
+                else if (val > 0.50) {
+                    color = 0xAAAAAA;  // light gray
+                    error = val - 0.67;
+                }
+                else if (val > 0.25) {
+                    color = 0x555555;  // dark gray
+                    error = val - 0.33;
+                }
+                else {
+                    color = 0x000000;  // black
+                    error = val - 0.0;
+                }
+
+                // Note: setColor takes ~10% of the time, so avoid it when it's redundant:
+                if (color != lastColor) {
+                    dc.setColor(color, -1);
+                    lastColor = color;
+                }
+
+                dc.drawPoint(centerX + x, centerY + y);
+
+                // Diffuse residual value to four neighboring pixels:
+
+                // The pixel on the right gets error from the previous row, and from this pixel:
+                nextError = consumeError(x + 1) + error*7.0/16;
+
+                // Accumulate some error in the buffer to be used when the next row is committed:
+                accumulateError(x - 1, error, 3.0/16);
+                accumulateError(x,     error, 5.0/16);
+                accumulateError(x + 1, error, 1.0/16);
+            }
+        }
+    }
+
+    // Lookup the error from the pixels above, and clear it so it can be re-used.
+    private function consumeError(x as Number) as Float {
+        var idx = radius + x + 1;
+        var err = errors[idx];
+        errors[idx] = null;
+        return err != null ? err : 0.0;
+    }
+
+    // Add some diffused error to one of the pixels below the current row.
+    private function accumulateError(x as Number, error as Float, weight as Float) as Void {
+        var idx = radius + x + 1;
+        var prev = errors[idx];
+        if (prev == null) { prev = 0.0; }
+        errors[idx] = prev + error*weight;
+    }
 
     // Note: tried using four Longs as bit vectors to hold pixels, then making only
     // one setColor call per row. It added 30% to the total frame onUpdate() time.
