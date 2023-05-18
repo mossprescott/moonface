@@ -49,21 +49,6 @@ class moonfaceView extends WatchUi.WatchFace {
     // the state of this View and prepare it to be shown. This includes
     // loading resources into memory.
     function onShow() as Void {
-        showSeconds = Properties.getValue("ShowSeconds") as Boolean;
-        switch (Properties.getValue("Theme") as ThemeOption) {
-            case colorful:
-                theme = MFColors.Colorful;
-                break;
-            case light:
-                theme = MFColors.Light;
-                break;
-            case dark:
-                theme = MFColors.Dark;
-                break;
-            case lightAndDark:
-                theme = MFColors.LightAndDark;
-                break;
-        }
     }
 
     // Update the view
@@ -72,19 +57,8 @@ class moonfaceView extends WatchUi.WatchFace {
 
         System.println("onUpdate()");
 
-        switch (Properties.getValue("LocationOption") as LocationOption) {
-            case hamden:
-                location = Hamden;
-                break;
-            case newOrleans:
-                location = NewOrleans;
-                break;
-            default:
-                location = Location3.getLocation();
-                if (location == null) { location = Hamden; }
-                else if (location.altitude == null) { location.altitude = 0.0; }
-                break;
-        }
+        readProperties();
+        readLocation();
 
         drawAll(dc, false);
     }
@@ -119,7 +93,39 @@ class moonfaceView extends WatchUi.WatchFace {
         }
     }
 
+    private function readProperties() as Void {
+        showSeconds = Properties.getValue("ShowSeconds") as Boolean;
+        switch (Properties.getValue("Theme") as ThemeOption) {
+            case colorful:
+                theme = MFColors.Colorful;
+                break;
+            case light:
+                theme = MFColors.Light;
+                break;
+            case dark:
+                theme = MFColors.Dark;
+                break;
+            case lightAndDark:
+                theme = MFColors.LightAndDark;
+                break;
+        }
+    }
 
+    private function readLocation() as Void {
+        switch (Properties.getValue("LocationOption") as LocationOption) {
+            case hamden:
+                location = Hamden;
+                break;
+            case newOrleans:
+                location = NewOrleans;
+                break;
+            default:
+                location = Location3.getLocation();
+                if (location == null) { location = Hamden; }
+                else if (location.altitude == null) { location.altitude = 0.0; }
+                break;
+        }
+    }
 
     private function drawAll(dc as Dc, secondsOnly as Boolean) as Void {
         var frameStart = System.getTimer();
