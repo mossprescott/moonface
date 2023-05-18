@@ -164,7 +164,7 @@ class MoonPixelRowWriter {
     private var dc as Graphics.Dc;
     private var centerX as Number;
     private var centerY as Number;
-    private var radius as Number;
+    // private var radius as Number;
 
     private var y as Number = 0;
     private var lastColor as ColorType = -1;
@@ -173,7 +173,7 @@ class MoonPixelRowWriter {
         self.dc = dc;
         self.centerX = centerX;
         self.centerY = centerY;
-        self.radius = radius;
+        // self.radius = radius;
     }
 
     function setRow(y as Number) as Void {
@@ -207,6 +207,13 @@ class MoonPixelRowWriter {
     }
 
     // TODO: function commitRow()
+
+    // Note: tried using four Longs as bit vectors to hold pixels, then making only
+    // one setColor call per row. It added 30% to the total frame onUpdate() time.
+    // Presumably Longs are just super not-optimized; possibly always boxed, judging by
+    // the Memory view.
+    // Maybe try using an Array<Number> instead? That's cleaner in memory, but more importantly
+    // maybe bitwise ops are faster.
 }
 
 // Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase
