@@ -475,7 +475,8 @@ class MoonBuffer {
             bitmap = ref.get() as BufferedBitmap;
         }
 
-        var needReset = false;
+        var ALWAYS_DRAW = false;
+        var needReset = ALWAYS_DRAW;
 
         if (radius != savedRadius) {
             needReset = true;
