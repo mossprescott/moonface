@@ -43,31 +43,57 @@ class MoonPixels {
                          parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal,
                          fromRow as Number?) as Number? {
 
-        var writer = new MoonPixelRowWriter(dc, centerX, centerY, radius);
         var calc = new MoonFaceCalculator(radius, parallacticAngle, illuminationFraction, phase);
+        var writer = new MoonPixelRowWriter(dc, centerX, centerY, radius);
 
         var startRow = fromRow != null ? fromRow : -radius;
         for (var y = startRow; y <= radius; y += 1) {
+            calc.setRow(y);
             writer.setRow(y);
 
-            calc.setRow(y);
-
-            // TODO: each row must have some pixels at either left or right edge, possibly both.
+            // Each row must have some pixels at either left or right edge, possibly both.
             // Start at each end and go until a non-illuminated pixel is found, or all pixels are
             // seen.
-            // var left = calc.illuminated(calc.minX);
-            // var right = calc.illuminated(calc.maxX);
-            // System.println(Lang.format("$1$; $2$: $3$; $4$: $5$", [y, calc.minX, left, calc.maxX, right]));
 
-            for (var x = calc.minX; x <= calc.maxX; x += 1) {
-                if (calc.illuminated(x)) {
-                    // TODO: round/interpolate?
-                    var val = getRectangular(calc.mx.toNumber(), calc.my.toNumber());  // 16ms
-                    if (val != null) {
-                        writer.setPixel(x, val);
+            // First check the left edge and scan left-to-right if needed:
+            var left = calc.illuminated(calc.minX);
+            var maxTested = calc.minX;
+            if (left) {
+                writer.setPixel(calc.minX, getRectangular(calc.mx.toNumber(), calc.my.toNumber()));
+
+                var x;
+                for (x = calc.minX+1; x <= calc.maxX; x += 1) {
+                    if (calc.illuminated(x)) {
+                        writer.setPixel(x, getRectangular(calc.mx.toNumber(), calc.my.toNumber()));
+                    }
+                    else {
+                        break;
+                    }
+                }
+                maxTested = x;
+            }
+
+            // Now, if we haven't scanned the entire row yet, scan back from the right:
+            if (maxTested < calc.maxX) {
+                var right = calc.illuminated(calc.maxX);
+                if (right) {
+                    writer.setPixel(calc.maxX, getRectangular(calc.mx.toNumber(), calc.my.toNumber()));
+
+                    // System.println(Lang.format("Right arm needed: y=$1$, maxTested: $2$", [y, maxTested]));
+
+                    var x;
+                    for (x = calc.maxX-1; x >= maxTested; x -= 1) {
+                        if (calc.illuminated(x)) {
+                            writer.setPixel(x, getRectangular(calc.mx.toNumber(), calc.my.toNumber()));
+                        }
+                        else {
+                            break;
+                        }
                     }
                 }
             }
+
+            // writer.commitRow();  // Will need this when/if there's any per-row state to maintain
 
             // Check the remaining execution time budget after each row. Using the actual clock
             // hopefully means that we can draw as much as possible in any given frame, depending
@@ -154,26 +180,30 @@ class MoonPixelRowWriter {
         self.y = y;
     }
 
-    function setPixel(x as Number, val as Float) as Void {
-        var color;
-        if (val > 0.75) {
-            color = 0xFFFFFF;  // white
+    function setPixel(x as Number, val as Float?) as Void {
+        if (val != null) {
+            var color;
+            if (val > 0.75) {
+                color = 0xFFFFFF;  // white
+            }
+            else if (val > 0.50) {
+                color = 0xAAAAAA;  // light gray
+            }
+            else if (val > 0.25) {
+                color = 0x555555;  // dark gray
+            }
+            else {
+                color = 0x000000;  // black
+            }
+
+            // Note: setColor takes ~10% of the time, so avoid it when it's redundant:
+            if (color != lastColor) {
+                dc.setColor(color, -1);
+                lastColor = color;
+            }
+
+            dc.drawPoint(centerX + x, centerY + y);
         }
-        else if (val > 0.50) {
-            color = 0xAAAAAA;  // light gray
-        }
-        else if (val > 0.25) {
-            color = 0x555555;  // dark gray
-        }
-        else {
-            color = 0x000000;  // black
-        }
-        // Note: setColor takes ~10% of the time, so avoid it when it's redundant:
-        if (color != lastColor) {
-            dc.setColor(color, -1);  // 4ms
-            lastColor = color;
-        }
-        dc.drawPoint(centerX + x, centerY + y);      // 7ms
     }
 
     // TODO: function commitRow()
