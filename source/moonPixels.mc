@@ -12,10 +12,6 @@ const WORDS_PER_ROW as Number = (SIZE + PIXELS_PER_WORD-1)/PIXELS_PER_WORD;
 const PIXEL_MASK as Number = (1 << BITS_PER_PIXEL) - 1;
 const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 
-// A limit on the total amount of points to ever draw in a single cycle, to avoid
-// running into the execution time limit. No way to come up with a precise figure,
-// this is the result of a little trial and error.
-const MAX_PLOTTED as Number = 600;
 
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
 // JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
@@ -49,7 +45,6 @@ class MoonPixels {
 
         var writer = new MoonPixelRowWriter(dc, centerX, centerY, radius);
         var calc = new MoonFaceCalculator(radius, parallacticAngle, illuminationFraction, phase);
-        var plottedCount = 0;
 
         var startRow = fromRow != null ? fromRow : -radius;
         for (var y = startRow; y <= radius; y += 1) {
@@ -64,29 +59,25 @@ class MoonPixels {
             // var right = calc.illuminated(calc.maxX);
             // System.println(Lang.format("$1$; $2$: $3$; $4$: $5$", [y, calc.minX, left, calc.maxX, right]));
 
-            var drewSome = false;
-
             for (var x = calc.minX; x <= calc.maxX; x += 1) {
-                // TEMP: count every pixel we look at
-                plottedCount += 1;
-
                 if (calc.illuminated(x)) {
                     // TODO: round/interpolate?
                     var val = getRectangular(calc.mx.toNumber(), calc.my.toNumber());  // 16ms
                     if (val != null) {
                         writer.setPixel(x, val);
-                        // plottedCount += 1;
-
-                        if (plottedCount >= MAX_PLOTTED) {
-                            System.println(Lang.format("Aborting drawing at ($1$, $2$) (radius: $3$)", [x, y, radius]));
-                            return y;
-                        }
                     }
                 }
             }
-        }
 
-        //System.println(Lang.format("plotted: $1$", [plottedCount]));
+            // Check the remaining execution time budget after each row. Using the actual clock
+            // hopefully means that we can draw as much as possible in any given frame, depending
+            // on what other work might have been done. But always leave some margin for any
+            // other tasks that are going to follow.
+            if (moonfaceApp.throttle.getRemainingTime() < 0.2) {
+                System.println(Lang.format("Aborting drawing at row $1$ (radius: $2$) (out of time)", [y, radius]));
+                return y;
+            }
+        }
 
         return null;
     }

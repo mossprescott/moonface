@@ -68,6 +68,8 @@ class moonfaceView extends WatchUi.WatchFace {
 
     // Update the view
     function onUpdate(dc as Dc) as Void {
+        moonfaceApp.throttle.updateStarted();
+
         System.println("onUpdate()");
 
         switch (Properties.getValue("LocationOption") as LocationOption) {
@@ -109,6 +111,8 @@ class moonfaceView extends WatchUi.WatchFace {
     // Note: it's not clear to me whether this applies only to OLED watches, but it seems
     // prudent to do as little drawing as possible.
     function onPartialUpdate(dc as Dc) as Void {
+        moonfaceApp.throttle.updateStarted();
+
         System.println("onPartialUpdate()");
         if (showSeconds) {
             drawAll(dc, true);

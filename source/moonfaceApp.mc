@@ -3,6 +3,7 @@ import Toybox.Lang;
 import Toybox.WatchUi;
 
 class moonfaceApp extends Application.AppBase {
+    public static var throttle as Throttle = new Throttle();
 
     function initialize() {
         AppBase.initialize();
