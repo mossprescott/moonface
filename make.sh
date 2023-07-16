@@ -25,14 +25,19 @@ ls -lh "$DIR/resources/jsonData"
 
 cd "$DIR"
 
-PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-4.2.2-2023-03-09-6ec276508/bin:$PATH"
+# PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-4.2.2-2023-03-09-6ec276508/bin:$PATH"
 # PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-4.2.4-2023-04-05-5830cc591/bin:$PATH"
+
+echo "Using SDK: $CONNECTIQ_HOME"
+PATH="$CONNECTIQ_HOME/bin:$PATH"
+
+DEVELOPER_KEY_PATH="$CONNECTIQ_HOME/../../../developer_key"
 
 # See https://developer.garmin.com/connect-iq/core-topics/unit-testing/
 monkeyc \
     -f monkey.jungle  \
     -o build/test/moonface.prg \
-    -y "$HOME/Developer/Garmin/developer_key" \
+    -y  "$DEVELOPER_KEY_PATH" \
     -d fenix7_sim \
     -warn --typecheck 2 \
     --unit-test
@@ -51,7 +56,7 @@ for device in "fenix7"; do
     monkeyc \
         -f monkey.jungle  \
         -o build/$device/moonface.prg \
-        -y "$HOME/Developer/Garmin/developer_key" \
+        -y "$DEVELOPER_KEY_PATH" \
         -d $device \
         --optimization 2 \
         --release
