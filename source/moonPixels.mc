@@ -166,6 +166,10 @@ class MoonPixelRowWriter {
     private var centerY as Number;
     private var radius as Number;
 
+    // cached values:
+    private var width;
+
+    // state:
     private var y as Number = 0;
     private var values as Array<Float?>;
     private var errors as Array<Float?>;
@@ -177,13 +181,15 @@ class MoonPixelRowWriter {
         self.centerY = centerY;
         self.radius = radius;
 
-        values = new Array<Float?>[2*(radius+1)];
-        errors = new Array<Float?>[2*(radius+2)];
+        width = 2*(radius+1);
+
+        values = new Array<Float?>[width];
+        errors = new Array<Float?>[width];
     }
 
     function setRow(y as Number) as Void {
         self.y = y;
-        for (var i = 0; i < values.size(); i += 1) {
+        for (var i = 0; i < width; i += 1) {
             values[i] = null;
         }
     }
