@@ -181,7 +181,7 @@ class MoonPixelRowWriter {
         self.centerY = centerY;
         self.radius = radius;
 
-        width = 2*(radius+1);
+        width = 2*radius + 3;
 
         values = new Array<Float?>[width];
         errors = new Array<Float?>[width];
