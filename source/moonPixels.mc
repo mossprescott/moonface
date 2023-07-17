@@ -3,6 +3,7 @@ import Toybox.Lang;
 import Toybox.Math;
 import Toybox.System;
 import Toybox.Test;
+using Toybox.StringUtil;
 
 const SIZE as Number = 128;
 const BITS_PER_PIXEL as Number = 6;
@@ -12,15 +13,19 @@ const WORDS_PER_ROW as Number = (SIZE + PIXELS_PER_WORD-1)/PIXELS_PER_WORD;
 const PIXEL_MASK as Number = (1 << BITS_PER_PIXEL) - 1;
 const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 
+const PIXELS_PER_CHAR = 6;
+const NUM_PIXEL_CHARS = 1 << PIXELS_PER_CHAR;
 
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
 // JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
 // and the Toybox API seems to provide very little access to Bitmap or even String resources.
 class MoonPixels {
     private var pixelData as Array<Number>;
+    private var smasher as MoonPixelSmasher;
 
     public function initialize() {
         pixelData = WatchUi.loadResource(Rez.JsonData.moonPixels) as Array<Number>;
+        smasher = new MoonPixelSmasher();
     }
 
     // Get the brightness at some location.
@@ -44,7 +49,7 @@ class MoonPixels {
                          fromRow as Number?) as Number? {
 
         var calc = new MoonFaceCalculator(radius, parallacticAngle, illuminationFraction, phase);
-        var writer = new MoonPixelRowWriter(dc, centerX, centerY, radius);
+        var writer = new MoonPixelRowWriter(dc, centerX, centerY, radius, smasher);
 
         var startRow = fromRow != null ? fromRow : -radius;
         for (var y = startRow; y <= radius; y += 1) {
@@ -165,6 +170,7 @@ class MoonPixelRowWriter {
     private var centerX as Number;
     private var centerY as Number;
     private var radius as Number;
+    private var smasher as MoonPixelSmasher;
 
     // cached values:
     private var width;
@@ -173,13 +179,13 @@ class MoonPixelRowWriter {
     private var y as Number = 0;
     private var values as Array<Float?>;
     private var errors as Array<Float?>;
-    private var lastColor as ColorType = -1;
 
-    function initialize(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number) {
+    function initialize(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number, smasher as MoonPixelSmasher) {
         self.dc = dc;
         self.centerX = centerX;
         self.centerY = centerY;
         self.radius = radius;
+        self.smasher = smasher;
 
         width = 2*radius + 3;
 
@@ -207,47 +213,60 @@ class MoonPixelRowWriter {
         // contrast might be lost. In theory, that error could be attributed to
         // the nearest illuminated pixel, but probably it's not noticeable anyway.
 
-        for (var x = -radius; x <= radius; x += 1) {
-            var val = values[radius + x];
-            if (val != null) {
-                val += nextError;
+        for (var x = -radius; x <= radius; x += PIXELS_PER_CHAR) {
+            var bits0 = 0;
+            var bits1 = 0;
+            var bits2 = 0;
+            var bits3 = 0;
 
-                var color;
-                var error;
-                if (val > 0.75) {
-                    color = 0xFFFFFF;  // white
-                    error = val - 1;
+            for (var b = 0; b < PIXELS_PER_CHAR and (x + b) <= radius; b += 1) {
+                var val = values[radius + (x + b)];
+                if (val != null) {
+                    val += nextError;
+
+                    var bit = 1 << b;
+                    var error;
+                    if (val > 0.75) {
+                        bits3 |= bit;  // white
+                        error = val - 1;
+                    }
+                    else if (val > 0.50) {
+                        bits2 |= bit;  // light gray
+                        error = val - 0.67;
+                    }
+                    else if (val > 0.25) {
+                        bits1 |= bit;  // dark gray
+                        error = val - 0.33;
+                    }
+                    else {
+                        bits0 |= bit;  // black
+                        error = val - 0.0;
+                    }
+
+                    // Diffuse residual value to four neighboring pixels:
+
+                    // The pixel on the right gets error from the previous row, and from this pixel:
+                    nextError = consumeError(x + 1) + error*7.0/16;
+
+                    // Accumulate some error in the buffer to be used when the next row is committed:
+                    accumulateError(x - 1, error, 3.0/16);
+                    accumulateError(x,     error, 5.0/16);
+                    accumulateError(x + 1, error, 1.0/16);
                 }
-                else if (val > 0.50) {
-                    color = 0xAAAAAA;  // light gray
-                    error = val - 0.67;
-                }
-                else if (val > 0.25) {
-                    color = 0x555555;  // dark gray
-                    error = val - 0.33;
-                }
-                else {
-                    color = 0x000000;  // black
-                    error = val - 0.0;
-                }
-
-                // Note: setColor takes ~10% of the time, so avoid it when it's redundant:
-                if (color != lastColor) {
-                    dc.setColor(color, -1);
-                    lastColor = color;
-                }
-
-                dc.drawPoint(centerX + x, centerY + y);
-
-                // Diffuse residual value to four neighboring pixels:
-
-                // The pixel on the right gets error from the previous row, and from this pixel:
-                nextError = consumeError(x + 1) + error*7.0/16;
-
-                // Accumulate some error in the buffer to be used when the next row is committed:
-                accumulateError(x - 1, error, 3.0/16);
-                accumulateError(x,     error, 5.0/16);
-                accumulateError(x + 1, error, 1.0/16);
+            }
+            // Note: up to four setColor/drawText calls for each 6 pixels isn't so promising.
+            // Reducing that would mean building a different array and string for each color and row.
+            if (bits0 != 0) {
+                smasher.drawPixels(dc, centerX + x, centerY + y, Graphics.COLOR_BLACK, bits0);
+            }
+            if (bits1 != 0) {
+                smasher.drawPixels(dc, centerX + x, centerY + y, Graphics.COLOR_DK_GRAY, bits1);
+            }
+            if (bits2 != 0) {
+                smasher.drawPixels(dc, centerX + x, centerY + y, Graphics.COLOR_LT_GRAY, bits2);
+            }
+            if (bits3 != 0) {
+                smasher.drawPixels(dc, centerX + x, centerY + y, Graphics.COLOR_WHITE, bits3);
             }
         }
     }
@@ -274,6 +293,29 @@ class MoonPixelRowWriter {
     // the Memory view.
     // Maybe try using an Array<Number> instead? That's cleaner in memory, but more importantly
     // maybe bitwise ops are faster.
+}
+
+// Draws up to 6 pixels at once, using one of 64 pre-allocated strings and our custom font.
+//
+// Note: a single instance should be allocated and cached, to avoid the overhead of repeated
+// initialization.
+class MoonPixelSmasher {
+    private var font as FontReference;
+    private var strs as Array<String>;
+
+    function initialize() {
+        font = WatchUi.loadResource(Rez.Fonts.Pixels) as FontReference;
+
+        strs = new Array<String>[NUM_PIXEL_CHARS];
+        for (var i = 0; i < NUM_PIXEL_CHARS; i += 1) {
+            strs[i] = StringUtil.utf8ArrayToString([i]);
+        }
+    }
+
+    function drawPixels(dc as Dc, left as Number, y as Number, color as ColorValue, pixels as Number) {
+        dc.setColor(color, -1);
+        dc.drawText(left, y, font, strs[pixels], Graphics.TEXT_JUSTIFY_LEFT);
+    }
 }
 
 // Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase

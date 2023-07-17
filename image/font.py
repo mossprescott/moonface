@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-"""Generate a bitmap font for drawing multiple 2-bit grayscale pixels at a time.
+"""Generate a bitmap font for drawing multiple pixels at a time.
 """
 
 import json
@@ -10,30 +10,24 @@ import numpy as np
 from PIL import Image
 
 
-PIXELS_PER_CHAR = 3
-NUM_CHARS = 5**PIXELS_PER_CHAR
+PIXELS_PER_CHAR = 6
+NUM_CHARS = 2**PIXELS_PER_CHAR
 
-# char 0:
-# 0 0 0 0 0 => all
+
+WHITE = 0xFF
+BLACK = 0x00
 
 def main():
     dir = sys.argv[1]
 
-    pixels = np.zeros((NUM_CHARS, PIXELS_PER_CHAR), dtype=np.int32)
-
-    def set(x, y, val):
-        if val != 0:
-            pixels[y, x] = 0xFF000000 | (0x555555*(val-1))
+    pixels = np.zeros((NUM_CHARS, PIXELS_PER_CHAR), dtype=np.int8)
 
     for row in range(NUM_CHARS):
-        # set(0, row, (row//25)%5)
-        # set(1, row, (row//5)%5)
-        # set(2, row, row%5)
         for col in range(PIXELS_PER_CHAR):
-            val = (row//(5 ** (PIXELS_PER_CHAR-col-1))) % 5
-            set(col, row, val)
+            val = row & (1 << col) != 0
+            pixels[row, col] = WHITE if val else BLACK
 
-    im = Image.fromarray(pixels, mode="RGBA")
+    im = Image.fromarray(pixels, mode="L")
     # im.show()
     im.save(f"{dir}/pixels.png")
 
