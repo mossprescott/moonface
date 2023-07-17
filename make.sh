@@ -16,6 +16,10 @@ cd "$DIR/image"
 python convert.py > "$DIR/resources/jsonData/moonPixels.json"
 ls -lh "$DIR/resources/jsonData"
 
+python font.py $DIR/resources/fonts
+ls -lh "$DIR/resources/fonts"
+
+
 # Note: the compiler won't detect a modified resource file, so manually delete build/ when changes are made
 
 
