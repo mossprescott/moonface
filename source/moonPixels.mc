@@ -13,7 +13,7 @@ const WORDS_PER_ROW as Number = (SIZE + PIXELS_PER_WORD-1)/PIXELS_PER_WORD;
 const PIXEL_MASK as Number = (1 << BITS_PER_PIXEL) - 1;
 const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 
-const PIXELS_PER_CHAR = 6;
+const PIXELS_PER_CHAR = 9;
 const NUM_PIXEL_CHARS = 1 << PIXELS_PER_CHAR;
 
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
@@ -308,7 +308,14 @@ class MoonPixelSmasher {
 
         strs = new Array<String>[NUM_PIXEL_CHARS];
         for (var i = 0; i < NUM_PIXEL_CHARS; i += 1) {
-            strs[i] = StringUtil.utf8ArrayToString([i]);
+            // Hand-rolled UTF-8 encoding for values up to 11 bits:
+            // Note 0x00 is encoded in two bytes (to avoid being confused with a C-string terminator?)
+            if (i > 0 && i <= 0x7F) {
+                strs[i] = StringUtil.utf8ArrayToString([i]);
+            }
+            else {
+                strs[i] = StringUtil.utf8ArrayToString([0xC0 | (i >> 6), 0x80 | (i & 0x3F)]);
+            }
         }
     }
 
