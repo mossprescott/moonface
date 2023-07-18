@@ -47,7 +47,3 @@ earlier API versions.
 For AMOLED models, would want to try a more subtle design, and there would be no need to dither
 the moon image (but you might want to start with more resolution and bit-depth.)
 
-
-## License
-
-TBD
