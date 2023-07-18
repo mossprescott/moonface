@@ -469,28 +469,11 @@ function testGetOne(logger as Logger) as Boolean {
     return true;
 }
 
-// function typeOf(obj as Object) as String {
-//     if (obj == null) { return "<null>"; }
-//     switch (obj) {
-//         case instanceof String: return "String";
-//         case instanceof Char: return "Char";
-//         case instanceof Number: return "Number";
-//         case instanceof Long: return "Long";
-//         case instanceof Float: return "Float";
-//         case instanceof Double: return "Double";
-//         case instanceof Array: return "Array";
-//         case instanceof Dictionary: return "Dictionary";
-//         case instanceof Symbol: return "Symbol";
-//         default: return "?";
-//     }
-// }
 
 /*
 Notes on encoding raw data for use in Monkey C:
 
 No apparent way to access pixel data in images.
-
-Array<Number> or Array<Long> (probably) means boxed integers, and lots of wasted space.
 
 Use String to hold packed bytes, and decode them at runtime?
 - what is the source encoding for String? Not documented.
@@ -524,21 +507,12 @@ JSON-encoded chars:
   instead of pointers
 - 16,655 bytes = 3327*5 + 20
 - that's kinda nutty but apparently that's the deal
+- seems like the best option for now
 
-
-Current (dumb) option:
-- 128x128 pixels
-- simple, nested JSON arrays
-- a Number between 0 and 99 at each pixel
-- trimmed to remove all the empty pixels in the corners
-- source JSON is about 30K
-- adds about 65KB to the prg (78KB total)
-- that's too big to load, so removed some rows
-- for 92/128 rows: memory profiler says 52KB in memory for the nested array (655 bytes for each full row)
-
-All these decoding options sound like lot of allocation of temporary arrays and boxed values,
-but what choice are they giving me?
 
 Simulator vs. device:
-- draw time: 52ms in sim; 600ms on device
+- draw time: 20-52ms in sim; 600ms on device
+- "watchdog" will kill the face, based on opcode count; no obvious way to measure/estimate that
+  from code. Currently using System.getTimer to approximate it, but it's not consistent across
+  different devices.
 */
