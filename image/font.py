@@ -38,7 +38,7 @@ page id=0 file="pixels.png"
 """)
         f.write(f"chars count={NUM_CHARS}\n")
         for i in range(NUM_CHARS):
-            f.write(f"char id={i} x=0 y={i} width={PIXELS_PER_CHAR} height=1 xoffset=0 yoffset=0 xadvance={PIXELS_PER_CHAR} page=0 chnl=15\n")
+            f.write(f"char id={0x20 + i} x=0 y={i} width={PIXELS_PER_CHAR} height=1 xoffset=0 yoffset=0 xadvance={PIXELS_PER_CHAR} page=0 chnl=15\n")
 
 
 
