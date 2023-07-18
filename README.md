@@ -49,7 +49,3 @@ Not yet dithering the moon's image. That will make it a much more compelling vis
 For AMOLED models, would want to try a more subtle design, and there would be no need to dither
 the moon image (but you might want to start with more resolution and bit-depth.)
 
-
-## License
-
-TBD
