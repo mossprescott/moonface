@@ -32,8 +32,8 @@ def main():
     im.save(f"{dir}/pixels.png")
 
     with open(f"{dir}/pixels.fnt", "w") as f:
-        f.write(f"""info face="Pixels" size=-10 bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=0 aa=0 padding=0,0,0,0 spacing=1,1 outline=0
-common lineHeight=10 base=10 scaleW=256 scaleH=256 pages=1 packed=0 alphaChnl=1 redChnl=0 greenChnl=0 blueChnl=0
+        f.write(f"""info face="Pixels" size=10 bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=0 aa=0 padding=0,0,0,0 spacing=0,0 outline=0
+common lineHeight=2 base=1 scaleW=256 scaleH=256 pages=1 packed=0 alphaChnl=1 redChnl=0 greenChnl=0 blueChnl=0
 page id=0 file="pixels.png"
 """)
         f.write(f"chars count={NUM_CHARS}\n")
