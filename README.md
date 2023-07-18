@@ -44,8 +44,6 @@ Currently only configured to work on Fenix7 and SDK 4.2.x; could probably be por
 circular MIP-display models without too much trouble. Not sure how easy it would be to port to
 earlier API versions.
 
-Not yet dithering the moon's image. That will make it a much more compelling visual.
-
 For AMOLED models, would want to try a more subtle design, and there would be no need to dither
 the moon image (but you might want to start with more resolution and bit-depth.)
 
