@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 
-PIXELS_PER_CHAR = 9
+PIXELS_PER_CHAR = 10
 NUM_CHARS = 2**PIXELS_PER_CHAR
 
 

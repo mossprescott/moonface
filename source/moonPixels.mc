@@ -13,7 +13,7 @@ const WORDS_PER_ROW as Number = (SIZE + PIXELS_PER_WORD-1)/PIXELS_PER_WORD;
 const PIXEL_MASK as Number = (1 << BITS_PER_PIXEL) - 1;
 const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 
-const PIXELS_PER_CHAR = 9;
+const PIXELS_PER_CHAR = 10;
 const NUM_PIXEL_CHARS = 1 << PIXELS_PER_CHAR;
 
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
