@@ -168,8 +168,8 @@ class MoonPixels {
 
 // Collect values for a row of pixels at a time, so they can (eventually) be written as a batch.
 //
-// TODO: encapsulate dithering state here; the same instance should be used to write one row,
-// then advanced to the next.
+// Dithering state is encapsulated here; the same instance isused to write one row, then advanced
+// to the next, with error propagated from each row to the pixels below.
 class MoonPixelRowWriter {
     private var dc as Graphics.Dc;
     private var centerX as Number;
@@ -198,6 +198,8 @@ class MoonPixelRowWriter {
         errors = new Array<Float?>[width];
     }
 
+    // Prepare for writing pixel values for the next row; y is expected to increase by 1
+    // each time. All pixels in the row are initially cleared.
     function setRow(y as Number) as Void {
         self.y = y;
         for (var i = 0; i < width; i += 1) {
@@ -205,6 +207,7 @@ class MoonPixelRowWriter {
         }
     }
 
+    // Set the value of a pixel in the current row; these calls can happen in any order.
     function setPixel(x as Number, val as Float?) as Void {
         values[radius+x] = val;
     }
