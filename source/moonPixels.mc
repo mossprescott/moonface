@@ -16,6 +16,11 @@ const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
 const PIXELS_PER_CHAR = 10;
 const NUM_PIXEL_CHARS = 1 << PIXELS_PER_CHAR;
 
+// An alternative to time-based throttling. This is simpler, more consistent, and less
+// affected by variation in simulation speed. On the other hand, it doesn't addapt to
+// the number of pixels being renderes depending on the moon's phase.
+const MAX_ROWS_PER_UPDATE = 5;
+
 // Access and draw the pixels of an image of the moon's face. The pixels are stored in a
 // JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
 // and the Toybox API seems to provide very little access to Bitmap or even String resources.
@@ -104,7 +109,7 @@ class MoonPixels {
             // hopefully means that we can draw as much as possible in any given frame, depending
             // on what other work might have been done. But always leave some margin for any
             // other tasks that are going to follow.
-            if (moonfaceApp.throttle.getRemainingTime() < 0.33) {
+            if (y-startRow > MAX_ROWS_PER_UPDATE or moonfaceApp.throttle.getRemainingTime() < 0.33) {
                 System.println(Lang.format("Aborting drawing at row $1$ (radius: $2$) (out of time)", [y, radius]));
                 return y;
             }
