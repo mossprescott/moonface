@@ -316,14 +316,7 @@ class MoonPixelSmasher {
             // Avoid the ASCII control characters (in particular, "\n")
             var codePoint = 0x20 + i;
 
-            // Hand-rolled UTF-8 encoding for values up to 11 bits:
-            // Note 0x00 is encoded in two bytes (to avoid being confused with a C-string terminator?)
-            if (codePoint > 0 && codePoint <= 0x7F) {
-                strs[i] = StringUtil.utf8ArrayToString([codePoint]);
-            }
-            else {
-                strs[i] = StringUtil.utf8ArrayToString([0xC0 | (codePoint >> 6), 0x80 | (codePoint & 0x3F)]);
-            }
+            strs[i] = codePoint.toChar().toString();
         }
     }
 
