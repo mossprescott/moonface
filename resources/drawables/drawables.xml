@@ -1,3 +1,34 @@
 <drawables>
-    <bitmap id="LauncherIcon" filename="launcher_icon.png" />
+  <bitmap id="LauncherIcon" filename="launcher_icon.png" />
+
+  <bitmap id="Moon30_00" filename="moon30-00.png" />
+  <bitmap id="Moon30_01" filename="moon30-01.png" />
+  <bitmap id="Moon30_02" filename="moon30-02.png" />
+  <bitmap id="Moon30_03" filename="moon30-03.png" />
+  <bitmap id="Moon30_04" filename="moon30-04.png" />
+  <bitmap id="Moon30_05" filename="moon30-05.png" />
+  <bitmap id="Moon30_06" filename="moon30-06.png" />
+  <bitmap id="Moon30_07" filename="moon30-07.png" />
+  <bitmap id="Moon30_08" filename="moon30-08.png" />
+  <bitmap id="Moon30_09" filename="moon30-09.png" />
+  <bitmap id="Moon30_10" filename="moon30-10.png" />
+  <bitmap id="Moon30_11" filename="moon30-11.png" />
+  <bitmap id="Moon30_12" filename="moon30-12.png" />
+  <bitmap id="Moon30_13" filename="moon30-13.png" />
+  <bitmap id="Moon30_14" filename="moon30-14.png" />
+  <bitmap id="Moon30_15" filename="moon30-15.png" />
+  <bitmap id="Moon30_16" filename="moon30-16.png" />
+  <bitmap id="Moon30_17" filename="moon30-17.png" />
+  <bitmap id="Moon30_18" filename="moon30-18.png" />
+  <bitmap id="Moon30_19" filename="moon30-19.png" />
+  <bitmap id="Moon30_20" filename="moon30-20.png" />
+  <bitmap id="Moon30_21" filename="moon30-21.png" />
+  <bitmap id="Moon30_22" filename="moon30-22.png" />
+  <bitmap id="Moon30_23" filename="moon30-23.png" />
+  <bitmap id="Moon30_24" filename="moon30-24.png" />
+  <bitmap id="Moon30_25" filename="moon30-25.png" />
+  <bitmap id="Moon30_26" filename="moon30-26.png" />
+  <bitmap id="Moon30_27" filename="moon30-27.png" />
+  <bitmap id="Moon30_28" filename="moon30-28.png" />
+  <bitmap id="Moon30_29" filename="moon30-29.png" />
 </drawables>
