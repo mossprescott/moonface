@@ -15,39 +15,35 @@ from PIL import Image
 from PIL.Image import Resampling, Palette
 
 RAW_SIZE = 512
+CROP_PIXELS = 2  # To reduce some apparent artifacts seen around the edges of the disk
 
 
 def main():
     dir = sys.argv[1]
 
     src = Image.open(f"FullMoon2010-{RAW_SIZE}.png")
+    src = src.crop((CROP_PIXELS, CROP_PIXELS, RAW_SIZE-CROP_PIXELS, RAW_SIZE-CROP_PIXELS))
 
-    r = 30
-    for i in range(r):
-        name = f"moon{r}-{i:02d}.png"
-        # print(f"Writing image {path}")
-        img = munge(src, 90*i/r, r)
+    # # Test how much detail is preserved by the dithering:
+    # munge(src, 0, 500).show()
+
+    radius = 30
+    steps = 20  # Note: radius*π/2 or about radius*1.5 would be one-pixel steps around the perimeter
+    for i in range(steps):
+        name = f"moon{radius}-{i:02d}.png"
+        img = munge(src, 90*i/steps, radius)
         img.save(f"{dir}/{name}")
-        print(f"""  <bitmap id="Moon{r}_{i:02d}" filename="{name}" />""")
+        print(f"""  <bitmap id="Moon{radius}_{i:02d}" filename="{name}" />""")
 
 
 def munge(img, angle, radius):
     """Rotate, resize, and dither (in that order)."""
 
-    # img.show()
     img = img.rotate(angle, resample=Resampling.BICUBIC, fillcolor=(0, 0, 0))
-    # img.show()
-    img = img.resize((2*radius, 2*radius), resample=Resampling.BICUBIC)
-    # img.show()
 
-    # Four levels of gray, plus transparent, for 5 entries:
-    # palette = ImagePalette(mode="RGBA", palette=[0xFF000000, 0xFF555555, 0xFFAAAAAA, 0xFFFFFFFF, 0x00000000])
-    # img = img.quantize(colors=5, palette=palette)  # ???
-    # img.convert(mode="P", palette=Palette.WEB, colors=4)
-    # img.show()
+    img = img.resize((2*radius, 2*radius), resample=Resampling.BICUBIC)
 
     img = dither_mask(img)
-    # img.show()
 
     return img
 
