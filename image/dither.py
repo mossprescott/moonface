@@ -89,7 +89,7 @@ def dither_mask(img):
             elif val > 1/2:
                 qval = 2/3
                 pval = 0xAA
-            elif val > 1/2:
+            elif val > 1/4:
                 qval = 1/3
                 pval = 0x55
             else:
