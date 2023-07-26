@@ -21,7 +21,8 @@ const NewOrleans as Location3 = new Location3(Orbits.toRadians(29.97), Orbits.to
 class moonfaceView extends WatchUi.WatchFace {
     static var showSeconds as Boolean = false;
 
-    var moonBuffer as MoonBuffer;
+    // var moonBuffer as MoonBuffer;
+    var moonPixels as MoonPixels;
 
     var theme as MFColors.Theme;
 
@@ -35,7 +36,8 @@ class moonfaceView extends WatchUi.WatchFace {
     function initialize() {
         WatchFace.initialize();
 
-        moonBuffer = new MoonBuffer(MOON_UP_RADIUS);
+        // moonBuffer = new MoonBuffer(MOON_UP_RADIUS);
+        moonPixels = new MoonPixels();
 
         theme = MFColors.LightAndDark;
         palette = theme.day;
@@ -385,11 +387,13 @@ class moonfaceView extends WatchUi.WatchFace {
 
         if (skyCalc.onscreen()) {
             if (altitude >= 0) {
-                moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), MOON_UP_RADIUS, parallactic, illuminationFraction, phase);
+                moonPixels.draw(dc, skyCalc.x(), skyCalc.y(), MOON_UP_RADIUS, parallactic, illuminationFraction, phase);
+                // moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), MOON_UP_RADIUS, parallactic, illuminationFraction, phase);
             }
             else {
                 // TODO: use reduced contrast
-                moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), MOON_DOWN_RADIUS, parallactic, illuminationFraction, phase);
+                moonPixels.draw(dc, skyCalc.x(), skyCalc.y(), MOON_DOWN_RADIUS, parallactic, illuminationFraction, phase);
+                // moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), MOON_DOWN_RADIUS, parallactic, illuminationFraction, phase);
             }
         }
         else {
@@ -443,81 +447,100 @@ class moonfaceView extends WatchUi.WatchFace {
     }
 }
 
-class MoonBuffer {
-    // How long in seconds to keep re-using previously-rendered pixels before starting fresh
-    const RENDER_INTERVAL = new Duration(5*60);
+// class MoonBuffer {
+//     // How long in seconds to keep re-using previously-rendered pixels before starting fresh
+//     const RENDER_INTERVAL = new Duration(5*60);
 
-    var maxRadius as Number;
-    var pixelData as MoonPixels;
+//     var maxRadius as Number;
+//     var pixelData as MoonPixels;
 
-    // Strong reference, keeps the buffer in memory once it's created.
-    var savedBitmap as BufferedBitmap?;
+//     // Strong reference, keeps the buffer in memory once it's created.
+//     var savedBitmap as BufferedBitmap?;
 
-    // Radius of previous drawing in the buffer.
-    var savedRadius as Number?;
+//     // Radius of previous drawing in the buffer.
+//     var savedRadius as Number?;
 
-    // If previous drawing was incomplete, the row to continue with.
-    var drawCont as Number?;
+//     // If previous drawing was incomplete, the row to continue with.
+//     var drawCont as Number?;
 
-    // When present, the same pixels will be saved and re-used until we pass this time.
-    var validUntil as Moment?;
-    // In the simulator (and maybe when the time is adjusted?) the time can jump backward
-    var validFrom as Moment?;
+//     // When present, the same pixels will be saved and re-used until we pass this time.
+//     var validUntil as Moment?;
+//     // In the simulator (and maybe when the time is adjusted?) the time can jump backward
+//     var validFrom as Moment?;
 
-    function initialize(maxRadius as Number) {
-        self.maxRadius = maxRadius;
-        pixelData = new MoonPixels();
-    }
+//     var dbOptions;
 
-    function draw(dc as Dc, x as Number, y as Number, radius as Number, angle as Decimal, fraction as Decimal, phase as Decimal) as Void {
-        var bitmap;
-        if (savedBitmap != null) {
-            bitmap = savedBitmap;
-        }
-        else {
-            //Test.assert(Graphics has :createBufferedBitmap);
-            var ref = Graphics.createBufferedBitmap({
-                :width => maxRadius*2, :height => maxRadius*2,
-                // TODO: save memory and possibly time by using a limited palette?
-                // :palette => [0xFF000000, 0xFF555555, 0xFFAAAAAA, 0xFFFFFFFF, 0x00000000] as Array<ColorType>
-                // :palette => [0x000000, 0xFFFFFF] as Array<ColorType>
-            });
-            bitmap = ref.get() as BufferedBitmap;
-            savedBitmap = bitmap;
-        }
+//     function initialize(maxRadius as Number) {
+//         self.maxRadius = maxRadius;
+//         pixelData = new MoonPixels();
 
-        var ALWAYS_DRAW = false;
-        var needReset = ALWAYS_DRAW;
+//         var rotate90 = new AffineTransform();
+//         // rotate90.m00 = 0.0;
+//         // rotate90.m01 = -1.0;
+//         // rotate90.m10 = 1.0;
+//         // rotate90.m11 = 0.0;
+//         rotate90.setMatrix([
+//             0.0, -1.0, 0.0,
+//             1.0, 0.0, 0.0,
+//         ] as Array<Float>);
+//         dbOptions = {
+//             // :transform => rotate90,
+//         };
+//     }
 
-        if (radius != savedRadius) {
-            needReset = true;
-        }
+//     function draw(dc as Dc, x as Number, y as Number, radius as Number, angle as Decimal, fraction as Decimal, phase as Decimal) as Void {
+//         var bitmap;
+//         if (savedBitmap != null) {
+//             bitmap = savedBitmap;
+//         }
+//         else {
+//             //Test.assert(Graphics has :createBufferedBitmap);
+//             var ref = Graphics.createBufferedBitmap({
+//                 :width => maxRadius*2, :height => maxRadius*2,
+//                 // TODO: save memory and possibly time by using a limited palette?
+//                 // :palette => [0xFF000000, 0xFF555555, 0xFFAAAAAA, 0xFFFFFFFF, 0x00000000] as Array<ColorType>
+//                 // :palette => [0x000000, 0xFFFFFF] as Array<ColorType>
+//             });
+//             bitmap = ref.get() as BufferedBitmap;
+//             savedBitmap = bitmap;
+//         }
 
-        var now = Time.now();
-        if (validUntil == null or now.greaterThan(validUntil) or (validFrom != null and now.lessThan(validFrom))) {
-            needReset = true;
-        }
+//         var ALWAYS_DRAW = true;
+//         var needReset = ALWAYS_DRAW;
 
-        if (needReset) {
-            System.println("Rendering...");
+//         if (radius != savedRadius) {
+//             needReset = true;
+//         }
 
-            var bufferDc = bitmap.getDc();
-            bufferDc.clear();
-            drawCont = pixelData.draw(bufferDc, radius, radius, radius, angle, fraction, phase, null);
+//         var now = Time.now();
+//         if (validUntil == null or now.greaterThan(validUntil) or (validFrom != null and now.lessThan(validFrom))) {
+//             needReset = true;
+//         }
 
-            savedRadius = radius;
-            validFrom = now;
-            validUntil = now.add(RENDER_INTERVAL);
-        }
-        else if (drawCont != null) {
-            System.println(Lang.format("Continue rendering from row $1$...", [drawCont]));
-            var bufferDc = bitmap.getDc();
-            drawCont = pixelData.draw(bufferDc, radius, radius, radius, angle, fraction, phase, drawCont);
-        }
-        else {
-            System.println("Using previous rendering");
-        }
+//         // if (needReset) {
+//         //     System.println("Rendering...");
 
-        dc.drawBitmap(x - radius, y - radius, bitmap);
-    }
-}
+//         //     var bufferDc = bitmap.getDc();
+//         //     bufferDc.clear();
+//         //     drawCont = pixelData.draw(bufferDc, radius, radius, radius, angle, fraction, phase, null);
+
+//         //     savedRadius = radius;
+//         //     validFrom = now;
+//         //     validUntil = now.add(RENDER_INTERVAL);
+//         // }
+//         // else if (drawCont != null) {
+//         //     System.println(Lang.format("Continue rendering from row $1$...", [drawCont]));
+//         //     var bufferDc = bitmap.getDc();
+//         //     drawCont = pixelData.draw(bufferDc, radius, radius, radius, angle, fraction, phase, drawCont);
+//         // }
+//         // else {
+//         //     System.println("Using previous rendering");
+//         // }
+
+//         // // dc.drawBitmap(x - radius, y - radius, bitmap);
+//         // dc.drawBitmap2(x-radius, y-radius, bitmap, dbOptions);
+
+//         var img = WatchUi.loadResource(Rez.Drawables.Moon30_15);
+//         dc.drawBitmap2(x-30, y-30, img, dbOptions);
+//     }
+// }

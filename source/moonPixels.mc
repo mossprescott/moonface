@@ -4,277 +4,211 @@ import Toybox.Math;
 import Toybox.System;
 import Toybox.Test;
 
-const SIZE as Number = 128;
-const BITS_PER_PIXEL as Number = 6;
-const PIXELS_PER_WORD as Number = 5;
+const MAX_ROWS_PER_UPDATE = 2;
 
-const WORDS_PER_ROW as Number = (SIZE + PIXELS_PER_WORD-1)/PIXELS_PER_WORD;
-const PIXEL_MASK as Number = (1 << BITS_PER_PIXEL) - 1;
-const MAX_VALUE as Float = (1 << BITS_PER_PIXEL) - 1.0;
-
-
-// Access and draw the pixels of an image of the moon's face. The pixels are stored in a
-// JSON-formatted resource, because we want to do our own scaling, dithering, and rotation,
-// and the Toybox API seems to provide very little access to Bitmap or even String resources.
+// Access and draw the pixels of an image of the moon's face. The actual pixels are scaled,
+// rotated, and dithered at a selection of angles so that they can be drawn relatively
+// efficiently in whatever orientation is needed.
 class MoonPixels {
-    private var pixelData as Array<Number>;
+    var bitmapKeys as Array<Symbol> = [
+        Rez.Drawables.Moon30_00,
+        Rez.Drawables.Moon30_01,
+        Rez.Drawables.Moon30_02,
+        Rez.Drawables.Moon30_03,
+        Rez.Drawables.Moon30_04,
+        Rez.Drawables.Moon30_05,
+        Rez.Drawables.Moon30_06,
+        Rez.Drawables.Moon30_07,
+        Rez.Drawables.Moon30_08,
+        Rez.Drawables.Moon30_09,
+        Rez.Drawables.Moon30_10,
+        Rez.Drawables.Moon30_11,
+        Rez.Drawables.Moon30_12,
+        Rez.Drawables.Moon30_13,
+        Rez.Drawables.Moon30_14,
+        Rez.Drawables.Moon30_15,
+        Rez.Drawables.Moon30_16,
+        Rez.Drawables.Moon30_17,
+        Rez.Drawables.Moon30_18,
+        Rez.Drawables.Moon30_19,
+    ] as Array<Symbol>;
 
-    public function initialize() {
-        pixelData = WatchUi.loadResource(Rez.JsonData.moonPixels) as Array<Number>;
+    var nativeRadius as Number;
+    var stepAngle as Float;
+
+    var savedBufferRef as BufferedBitmapReference?;
+
+    var rotate90 as AffineTransform;
+    var rotate180 as AffineTransform;
+    var rotate270 as AffineTransform;
+
+    function initialize() {
+        nativeRadius = (WatchUi.loadResource(bitmapKeys[0]) as BitmapReference).getWidth()/2;
+
+        // Angle in radians between one image and the next, always an even fraction of π/2. Within
+        // any range of that size starting with the range centered at an angle of 0, the same
+        // pixels will get drawn.
+        stepAngle = (2*Math.PI)/(4*bitmapKeys.size());
+
+        // Rotation transforms:
+        //    cos, -sin,  tx
+        //    sin,  cos,  ty
+        // with translation as needed to rotate around the center point.
+        //
+        // Note: setting the elements manually with setMatrix results in weird scaling, even though
+        // the values seem to be identical.
+
+        rotate90 = new AffineTransform();
+        rotate90.translate(30.0, 30.0);
+        rotate90.rotate(Math.PI/2);
+        rotate90.translate(-30.0, -30.0);
+
+        rotate180 = new AffineTransform();
+        rotate180.translate(30.0, 30.0);
+        rotate180.rotate(Math.PI);
+        rotate180.translate(-30.0, -30.0);
+
+        rotate270 = new AffineTransform();
+        rotate270.translate(30.0, 30.0);
+        rotate270.rotate(Math.PI*3/2);
+        rotate270.translate(-30.0, -30.0);
+        // System.println(rotate270.getMatrix());
     }
 
-    // Get the brightness at some location.
-    // TODO: interpolate?
-    // Result is between 0 and 1, or null if the point is outside the disk.
-    public function getPolar(r as Decimal, theta as Decimal) as Decimal? {
-        var y = Math.round((SIZE/2)*r*Math.sin(theta)).toNumber();
-        var x = Math.round((SIZE/2)*r*Math.cos(theta)).toNumber();
-        return getRectangular(x, y);
+    // The size for which drawing results in pixel-accurate dithering.
+    function getNativeRadius() as Number {
+        return nativeRadius;
     }
 
-    // Draw some rows of the moon's face, at the given location and size, as specified by angle,
+    // Draw the moon's face, at the given location and size, as specified by angle,
     // fraction, and phase.
-    //
-    // The amount of work done on any single call is limited to avoid exceeding the limit on
-    // execution time for a watch face. If drawing isn't completed, the result contains the
-    // next row to be drawn, which can be passed in fromRow to a later call to continue drawing
-    // where it left off.
+    // The image is always drawn into an offscreen buffer and then copied to the destination.
     public function draw(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number,
-                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal,
-                         fromRow as Number?) as Number? {
+                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
+        var buffer = getBuffer(radius);
+        var bufferDc = buffer.getDc();
 
-        var calc = new MoonFaceCalculator(radius, parallacticAngle, illuminationFraction, phase);
-        var writer = new MoonPixelRowWriter(dc, centerX, centerY, radius);
+        // Start with a clean slate:
+        bufferDc.setColor(-1, -1);
+        bufferDc.clear();
 
-        var startRow = fromRow != null ? fromRow : -radius;
-        for (var y = startRow; y <= radius; y += 1) {
-            calc.setRow(y);
-            writer.setRow(y);
+        // Quantize the angle to match the pixels we drew. If the shadow falls differently across
+        // them it's fairly noticeable, and we can always generate more images if we want smaller
+        // angular increments. Rounding as opposed to truncating will make the jumps fall
+        // more nicely.
+        var adjustedAngle = stepAngle*Math.round(parallacticAngle/stepAngle);
 
-            // Each row must have some pixels at either left or right edge, possibly both.
-            // Start at each end and go until a non-illuminated pixel is found, or all pixels are
-            // seen.
+        drawFullMoon(bufferDc, radius, adjustedAngle);
 
-            // First check the left edge and scan left-to-right if needed:
-            var left = calc.illuminated(calc.minX);
-            var maxTested = calc.minX;
-            if (left) {
-                writer.setPixel(calc.minX, getRectangular(calc.mx.toNumber(), calc.my.toNumber()));
+        clearShadow(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
 
-                var x;
-                for (x = calc.minX+1; x <= calc.maxX; x += 1) {
-                    if (calc.illuminated(x)) {
-                        writer.setPixel(x, getRectangular(calc.mx.toNumber(), calc.my.toNumber()));
-                    }
-                    else {
-                        break;
-                    }
-                }
-                maxTested = x;
-            }
+        //
+        // Finally, copy the completed image to the destination:
+        //
+        dc.drawBitmap(centerX - radius, centerY - radius, buffer);
 
-            // Now, if we haven't scanned the entire row yet, scan back from the right:
-            if (maxTested < calc.maxX) {
-                var right = calc.illuminated(calc.maxX);
-                if (right) {
-                    writer.setPixel(calc.maxX, getRectangular(calc.mx.toNumber(), calc.my.toNumber()));
-
-                    // System.println(Lang.format("Right arm needed: y=$1$, maxTested: $2$", [y, maxTested]));
-
-                    var x;
-                    for (x = calc.maxX-1; x >= maxTested; x -= 1) {
-                        if (calc.illuminated(x)) {
-                            writer.setPixel(x, getRectangular(calc.mx.toNumber(), calc.my.toNumber()));
-                        }
-                        else {
-                            break;
-                        }
-                    }
-                }
-            }
-
-            writer.commitRow();
-
-            // Check the remaining execution time budget after each row. Using the actual clock
-            // hopefully means that we can draw as much as possible in any given frame, depending
-            // on what other work might have been done. But always leave some margin for any
-            // other tasks that are going to follow.
-            if (moonfaceApp.throttle.getRemainingTime() < 0.33) {
-                System.println(Lang.format("Aborting drawing at row $1$ (radius: $2$) (out of time)", [y, radius]));
-                return y;
-            }
-        }
-
-        return null;
+        // TEMP: verify placement
+        // dc.setColor(Graphics.COLOR_RED, -1);
+        // dc.drawCircle(centerX, centerY, radius);
     }
 
-    // Get the value, if any, for a point given in rectagular coords from the center of the disk.
-    // Returns a value between 0.0 and 1.0, or null if the point is outside the disk.
-    private function getRectangular(x as Number, y as Number) as Float? {
-        // Note: as near as I can tell, local variables don't cost anything at runtime, but
-        // accessing any member or static variable does, adding up to about 15% of the time
-        // for drawing. Meanwhile, Monkey C doesn't seem to have #define or any other compile-time
-        // constants.
-        // Correction: there is `const` as an alternative to `var`, but it's not clear that it
-        // has better performance, or even that it can handle these definitions.
-        // So all the constants are re-defined here as locals:
+    // Draw the entire disk in the current orientation:
+    private function drawFullMoon(dc as Dc, radius as Number, angle as Decimal) as Void {
+        var turns = angle/(2*Math.PI);
+        var turnFraction = turns - Math.floor(turns);
 
-        var local_SIZE = 128;
-        var local_HALF_SIZE = 64;
-        var local_PIXELS_PER_WORD = 5;
-        var local_BITS_PER_PIXEL = 6;
-        var local_PIXEL_MASK = 0x3f;   // (1 << BITS_PER_PIXEL) - 1;
-        var local_WORDS_PER_ROW = 26;  // (128 + 5-1)/5;
-        var local_MAX_VALUE = 63.0;    // PIXEL_MASK.toFloat();
-
-        // Uncomment to verify integrity:
-        // Test.assertEqual(local_SIZE,            SIZE);
-        // Test.assertEqual(local_PIXELS_PER_WORD, PIXELS_PER_WORD);
-        // Test.assertEqual(local_BITS_PER_PIXEL,  BITS_PER_PIXEL);
-        // Test.assertEqual(local_PIXEL_MASK,      PIXEL_MASK);
-        // Test.assertEqual(local_WORDS_PER_ROW,   WORDS_PER_ROW);
-        // Test.assertEqual(local_MAX_VALUE,       MAX_VALUE);
-
-        var rowIdx = local_HALF_SIZE + y;
-        var colIdx = local_HALF_SIZE + x;
-
-        // Not: ideally not needed given the check on radius in the caller, and actually costs ~25% of the time!?
-        if (rowIdx < 0 or rowIdx >= local_SIZE or colIdx < 0 or colIdx >= local_SIZE) {
-            return null;
+        var imgIndex = (turnFraction*4*bitmapKeys.size()).toNumber() % bitmapKeys.size();
+        var rt;
+        // System.println(Lang.format("turnFraction: $1$", [turnFraction]));
+        if (turnFraction >= 0.75) {
+            rt = rotate270;
+        } else if (turnFraction >= 0.5) {
+            rt = rotate180;
+        } else if (turnFraction >= 0.25) {
+            rt = rotate90;
+        } else {
+            rt = null;
         }
 
-        var wordIdx = (colIdx / local_PIXELS_PER_WORD).toNumber();
-        var offset = (colIdx % local_PIXELS_PER_WORD)*local_BITS_PER_PIXEL;
-
-        var raw = (pixelData[rowIdx*local_WORDS_PER_ROW + wordIdx] >> offset) & local_PIXEL_MASK;
-        if (raw == 0) {
-            return null;
+        var img = WatchUi.loadResource(bitmapKeys[imgIndex]) as BitmapReference;
+        if (radius == nativeRadius) {
+            if (rt == null) {
+                dc.drawBitmap(0, 0, img);
+            }
+            else {
+                dc.drawBitmap2(0, 0, img, { :transform => rt });
+            }
         }
         else {
-            return raw / local_MAX_VALUE;
-        }
-    }
-}
-
-// Collect values for a row of pixels at a time, so they can (eventually) be written as a batch.
-//
-// TODO: encapsulate dithering state here; the same instance should be used to write one row,
-// then advanced to the next.
-class MoonPixelRowWriter {
-    private var dc as Graphics.Dc;
-    private var centerX as Number;
-    private var centerY as Number;
-    private var radius as Number;
-
-    // cached values:
-    private var width;
-
-    // state:
-    private var y as Number = 0;
-    private var values as Array<Float?>;
-    private var errors as Array<Float?>;
-    private var lastColor as ColorType = -1;
-
-    function initialize(dc as Graphics.Dc, centerX as Number, centerY as Number, radius as Number) {
-        self.dc = dc;
-        self.centerX = centerX;
-        self.centerY = centerY;
-        self.radius = radius;
-
-        width = 2*(radius+1);
-
-        values = new Array<Float?>[width];
-        errors = new Array<Float?>[width];
-    }
-
-    function setRow(y as Number) as Void {
-        self.y = y;
-        for (var i = 0; i < width; i += 1) {
-            values[i] = null;
+            // For other sizes (mostly smaller), draw the same pixels, scaled as needed.
+            // This will spoil the dithering, but at small sizes it's not too noticeable
+            // and that's what we're using it for.
+            var st = new AffineTransform();
+            var sf = 1.0*radius/nativeRadius;
+            st.scale(sf, sf);
+            if (rt != null) { st.concatenate(rt); }
+            dc.drawBitmap2(0, 0, img, { :transform => st });
         }
     }
 
-    function setPixel(x as Number, val as Float?) as Void {
-        values[radius+x] = val;
+    // Erase portions of the moon's image that are currently in shadow.
+    private function clearShadow(dc as Dc, radius as Number,
+                        parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
+        // Note: Dc.clear seems to be the only way to write transparent pixels over the top of
+        // previous drawing. Although it seems like it might be expensive, it probably doesn't
+        // compare to the actual geometry we're doing.
+
+        var calc = new MoonFaceCalculator(radius, parallacticAngle, illuminationFraction, phase);
+
+        for (var y = -radius; y < radius; y += 1) {
+            calc.setRow(y);
+
+            if (!calc.illuminated(calc.minX)) {
+                // Some pixels on the left are dark:
+                // TODO: binary search
+                var x = calc.minX+1;
+                while (x <= calc.maxX and !calc.illuminated(x)) {
+                    x += 1;
+                }
+                // x is now either maxX, or it's the first visible pixel
+                // Note: clear all the way to the left edge, just in case there are any stray
+                // pixels in the source image (because there are).
+                dc.setClip(0, radius + y, radius + x-1, 1);
+                dc.clear();
+            }
+            // TODO: right side
+            // TODO: center
+
+            // Seems possibly expensive but the only way to actually clear to transparent?
+        }
+
+        dc.clearClip();
     }
 
-    function commitRow() as Void {
-        // Error diffused to the next pixel to the right.
-        var nextError = consumeError(-radius);
+    private function getBuffer(radius as Number) as BufferedBitmap {
+        var size = radius*2;
 
-        // Note: any error that gets diffused to a pixel that doesn't have a value
-        // just gets ignored. That means the image has sharp boundaries, but some
-        // contrast might be lost. In theory, that error could be attributed to
-        // the nearest illuminated pixel, but probably it's not noticeable anyway.
-
-        for (var x = -radius; x <= radius; x += 1) {
-            var val = values[radius + x];
-            if (val != null) {
-                val += nextError;
-
-                var color;
-                var error;
-                if (val > 0.75) {
-                    color = 0xFFFFFF;  // white
-                    error = val - 1;
-                }
-                else if (val > 0.50) {
-                    color = 0xAAAAAA;  // light gray
-                    error = val - 0.67;
-                }
-                else if (val > 0.25) {
-                    color = 0x555555;  // dark gray
-                    error = val - 0.33;
-                }
-                else {
-                    color = 0x000000;  // black
-                    error = val - 0.0;
-                }
-
-                // Note: setColor takes ~10% of the time, so avoid it when it's redundant:
-                if (color != lastColor) {
-                    dc.setColor(color, -1);
-                    lastColor = color;
-                }
-
-                dc.drawPoint(centerX + x, centerY + y);
-
-                // Diffuse residual value to four neighboring pixels:
-
-                // The pixel on the right gets error from the previous row, and from this pixel:
-                nextError = consumeError(x + 1) + error*7.0/16;
-
-                // Accumulate some error in the buffer to be used when the next row is committed:
-                accumulateError(x - 1, error, 3.0/16);
-                accumulateError(x,     error, 5.0/16);
-                accumulateError(x + 1, error, 1.0/16);
+        if (savedBufferRef != null) {
+            var buffer = savedBufferRef.get() as BufferedBitmap?;
+            if (buffer != null and buffer.getWidth() >= size) {
+                return buffer;
             }
         }
-    }
 
-    // Lookup the error from the pixels above, and clear it so it can be re-used.
-    private function consumeError(x as Number) as Float {
-        var idx = radius + x + 1;
-        var err = errors[idx];
-        errors[idx] = null;
-        return err != null ? err : 0.0;
+        var newBufferRef = Graphics.createBufferedBitmap({
+            :width => size, :height => size
+        });
+        var newBuffer = newBufferRef.get() as BufferedBitmap?;
+        if (newBuffer != null) {
+            savedBufferRef = newBufferRef;
+            return newBuffer;
+        }
+        else {
+            System.error("no buffer");
+        }
     }
-
-    // Add some diffused error to one of the pixels below the current row.
-    private function accumulateError(x as Number, error as Float, weight as Float) as Void {
-        var idx = radius + x + 1;
-        var prev = errors[idx];
-        if (prev == null) { prev = 0.0; }
-        errors[idx] = prev + error*weight;
-    }
-
-    // Note: tried using four Longs as bit vectors to hold pixels, then making only
-    // one setColor call per row. It added 30% to the total frame onUpdate() time.
-    // Presumably Longs are just super not-optimized; possibly always boxed, judging by
-    // the Memory view.
-    // Maybe try using an Array<Number> instead? That's cleaner in memory, but more importantly
-    // maybe bitwise ops are faster.
 }
+
 
 // Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase
 // of the moon.
@@ -315,6 +249,10 @@ class MoonFaceCalculator {
     public var maxX as Number;
 
     function initialize(radius as Number, parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) {
+        // A bogus factor relative to which some pixel-level adjustments are made. Used to be the
+        // size of the array of raw samples, not that that actually meant anything here.
+        var SIZE = 128;
+
         var scale = (SIZE/2)/radius.toFloat();
         t11 = (Math.cos(-parallacticAngle)*scale).toFloat();
         t21 = (Math.sin(-parallacticAngle)*scale).toFloat();
@@ -411,77 +349,3 @@ function testGetOne(logger as Logger) as Boolean {
 
     return true;
 }
-
-// function typeOf(obj as Object) as String {
-//     if (obj == null) { return "<null>"; }
-//     switch (obj) {
-//         case instanceof String: return "String";
-//         case instanceof Char: return "Char";
-//         case instanceof Number: return "Number";
-//         case instanceof Long: return "Long";
-//         case instanceof Float: return "Float";
-//         case instanceof Double: return "Double";
-//         case instanceof Array: return "Array";
-//         case instanceof Dictionary: return "Dictionary";
-//         case instanceof Symbol: return "Symbol";
-//         default: return "?";
-//     }
-// }
-
-/*
-Notes on encoding raw data for use in Monkey C:
-
-No apparent way to access pixel data in images.
-
-Array<Number> or Array<Long> (probably) means boxed integers, and lots of wasted space.
-
-Use String to hold packed bytes, and decode them at runtime?
-- what is the source encoding for String? Not documented.
-- can load from JSON, which is less efficient than UTF-8, but decent
-- can't extract a single char as a value
-- toCharArray() -> array of (Unicode) chars
-- toUtf8Array() -> array of bytes (in boxed 32-bit ints)
-- substring() -> hopefully doesn't copy the buffer?
-
-JSON-encoded chars:
-- clean: 32-127 only (95 values)
-- everything else is 6 bytes per character: "\u0000"
-- maybe two values per byte in base 8 (ala base64) or 9 (0-8)?
-- or two values per byte in base 10, using just a few of the ugly
-- or just scale the pixels to the range 0-95?
-- integers do get unpacked to Number (32-bit) or Long (64), as needed
-- same for Float/Double, by the way
-- scary: too many digits for Long results in null
-- annoying: changed json source doesn't get re-compiled
-- 64 bits in a Long encodes to 19 or 20 chars (depending on sign); 8 bytes at 2.5x overhead
-- or 9 7-bit values in 19 chars (never negative); 2.1x
-
-9*7 bits in each Long
-- 1919 Longs in a flat array
-- looks like each Long ends up on the heap, taking 17 bytes (according to the Memory view)
-- total of 33KB
-
-5*6 bits in each Number
-- 3327 Numbers in a flat array
-- no memory usage reported for each Number, implying that they're embedded in the Array
-  instead of pointers
-- 16,655 bytes = 3327*5 + 20
-- that's kinda nutty but apparently that's the deal
-
-
-Current (dumb) option:
-- 128x128 pixels
-- simple, nested JSON arrays
-- a Number between 0 and 99 at each pixel
-- trimmed to remove all the empty pixels in the corners
-- source JSON is about 30K
-- adds about 65KB to the prg (78KB total)
-- that's too big to load, so removed some rows
-- for 92/128 rows: memory profiler says 52KB in memory for the nested array (655 bytes for each full row)
-
-All these decoding options sound like lot of allocation of temporary arrays and boxed values,
-but what choice are they giving me?
-
-Simulator vs. device:
-- draw time: 52ms in sim; 600ms on device
-*/
