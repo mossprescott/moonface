@@ -13,8 +13,6 @@ DIR=$(pwd)  # Should be an absolute path
 cd "$DIR/image"
 
 . env/bin/activate
-# python convert.py > "$DIR/resources/jsonData/moonPixels.json"
-# ls -lh "$DIR/resources/jsonData"
 
 python dither.py "$DIR/resources/drawables"
 ls -lh "$DIR/resources/drawables"
