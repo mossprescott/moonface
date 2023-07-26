@@ -13,10 +13,14 @@ DIR=$(pwd)  # Should be an absolute path
 cd "$DIR/image"
 
 . env/bin/activate
-python convert.py > "$DIR/resources/jsonData/moonPixels.json"
-ls -lh "$DIR/resources/jsonData"
+# python convert.py > "$DIR/resources/jsonData/moonPixels.json"
+# ls -lh "$DIR/resources/jsonData"
 
-# Note: the compiler won't detect a modified resource file, so manually delete build/ when changes are made
+python dither.py "$DIR/resources/drawables"
+ls -lh "$DIR/resources/drawables"
+
+# Note: the compiler won't detect modified resources, so force it to rebuild them:
+rm -rf "$DIR/bin"
 
 
 #
