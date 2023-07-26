@@ -18,34 +18,24 @@ in the sky.
 
 ## Implementation
 
-Rendering of the moon is split over multiple frames to stay under the execution time limit imposed
-on watchfaces. This seems to work well in practice, with the drawing rarely being noticeable in
-normal use. In the simulator, you can easily watch the moon fill in across a few frames.
-Note: that approach doesn't actually save any power; it's just working around the platform's
-constraints.
+Images of the moon are rotated, scaled, and dithered to the MiP 64-color palette at build time,
+including an image for each step of rotating through 90 degrees. On each update, the appropriate
+image is chosen, rendered into an offscreen buffer (with rotation in ncrements of 90°), and then
+the "dark" portion of the disk is erased.
 
-Once a complete image is assembled, it's stored offscreen and re-used for several minutes,
-until some rotation will have occurred and then a new image is generated. Similar savings
-could be achieved by also caching the background with the hour indices in another offscreen buffer,
-but it would consume a lot more memory (from the Graphics pool.)
+That erasing now turns out to be the bottleneck, with lots of geometry to find the exact pixel
+boundaries of the moon's image for each row of the image, and then a `Dc.clear()` call.
 
-The data behind the moon's image is stored in obfuscated JSON form, since the fastest, most
-compact form I could get to work was `Array<Number>`, at 5 bytes in memory per 32-bits of data.
-5 pixels are packed into each word (6-bits each), with all the indexing and bit-manipulation
-done during drawing. Even so, a significant portion of the time is spent in `Dc.setColor` and
-`.drawPixel`, which I haven't been able to avoid.
+The actual drawing is relatively quick, even with a rotation and scale transform involved.
 
 
 ## Limitations
 
 Hasn't been used with locations/times where the sun and moon are in the *northern* sky.
 
-Currently only configured to work on Fenix7 and SDK 4.2.x; could probably be ported to recent
+Currently only configured to work on Fenix7 and SDK > 4.2.1; could probably be ported to recent
 circular MIP-display models without too much trouble. Not sure how easy it would be to port to
 earlier API versions.
 
-Not yet dithering the moon's image. That will make it a much more compelling visual.
-
 For AMOLED models, would want to try a more subtle design, and there would be no need to dither
 the moon image (but you might want to start with more resolution and bit-depth.)
-
