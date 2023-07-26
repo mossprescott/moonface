@@ -12,11 +12,10 @@ const COLOR_NONE as ColorType = -1;
 
 const TRACK_WIDTH as Number = 15;
 
-const MOON_UP_RADIUS = 30;
-const MOON_DOWN_RADIUS = 15;
 
 const Hamden as Location3 = new Location3(Orbits.toRadians(41.3460), Orbits.toRadians(-72.9125), 30.0);
 const NewOrleans as Location3 = new Location3(Orbits.toRadians(29.97), Orbits.toRadians(-90.3), 1.0);
+
 
 class moonfaceView extends WatchUi.WatchFace {
     static var showSeconds as Boolean = false;
@@ -386,15 +385,14 @@ class moonfaceView extends WatchUi.WatchFace {
         skyCalc.setPosition(azimuth, altitude);
 
         if (skyCalc.onscreen()) {
+            var radius;
             if (altitude >= 0) {
-                moonPixels.draw(dc, skyCalc.x(), skyCalc.y(), MOON_UP_RADIUS, parallactic, illuminationFraction, phase);
-                // moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), MOON_UP_RADIUS, parallactic, illuminationFraction, phase);
+                radius = moonPixels.getNativeRadius();
             }
             else {
-                // TODO: use reduced contrast
-                moonPixels.draw(dc, skyCalc.x(), skyCalc.y(), MOON_DOWN_RADIUS, parallactic, illuminationFraction, phase);
-                // moonBuffer.draw(dc, skyCalc.x(), skyCalc.y(), MOON_DOWN_RADIUS, parallactic, illuminationFraction, phase);
+                radius = moonPixels.getNativeRadius()/2;
             }
+            moonPixels.draw(dc, skyCalc.x(), skyCalc.y(), radius, parallactic, illuminationFraction, phase);
         }
         else {
             dc.setColor(palette.moonIndicator, COLOR_NONE);
