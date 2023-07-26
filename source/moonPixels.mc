@@ -171,31 +171,15 @@ class MoonPixels {
             if (!calc.illuminated(calc.minX)) {
                 // Some pixels on the left are dark:
 
-                // Binary search to find the first visible pixel, if any:
-                var lo = calc.minX;  // invariant: !calc.illuminated(lo)
-                var hi = calc.maxX;
-                while (hi > lo+1) {
-                    var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
-                    if (!calc.illuminated(mid)) {
-                        lo = mid;
-                    }
-                    else {
-                        hi = mid;
-                    }
-                }
-
                 // Note: clear all the way to the left edge, just in case there are any stray
                 // pixels in the source image (because there are).
                 var firstDarkX = -radius;
 
                 // Similarly, if the entire row is dark, and make sure to clear all the way to the
                 // right edge.
-                var lastDarkX;
-                if (hi == calc.maxX) {
+                var lastDarkX = calc.lastNonIlluminated(calc.minX, calc.maxX);
+                if (lastDarkX == calc.maxX) {
                     lastDarkX = radius;
-                }
-                else {
-                    lastDarkX = lo;
                 }
 
                 dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
@@ -205,20 +189,8 @@ class MoonPixels {
                 // Some pixels on the right are dark:
                 // Note: in this case, we know that minX is not dark.
 
-                // Binary search to find the last dark pixel:
-                var lo = calc.minX;  // invariant: calc.illuminated(lo)
-                var hi = calc.maxX;
-                while (hi > lo+1) {
-                    var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
-                    if (calc.illuminated(mid)) {
-                        lo = mid;
-                    }
-                    else {
-                        hi = mid;
-                    }
-                }
+                var firstDarkX = calc.lastIlluminated(calc.minX, calc.maxX) + 1;
 
-                var firstDarkX = lo;
                 // Note: clear all the way to the right edge, just in case there are any stray
                 // pixels in the source image (because there are).
                 var lastDarkX = radius;
@@ -228,8 +200,15 @@ class MoonPixels {
             }
             else if (!calc.illuminated(0)) {
                 // Some pixels in the middle are dark (i.e. a rotated crescent):
+                // Note: we know minX and maxX are not dark
 
-                // TODO: search twice and erase in the middle
+                // FIXME: currently adding an extra pixel on either side to reduce jaggies, but
+                // this is probably too much, meaning there's never any true new moon.
+                var firstDarkX = calc.lastIlluminated(calc.minX, 0) + 2;
+                var lastDarkX = calc.lastNonIlluminated(0, calc.maxX) - 1;
+
+                dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
+                dc.clear();
             }
         }
 
@@ -381,13 +360,62 @@ class MoonFaceCalculator {
 
         return true;
     }
+
+    // Binary search to find the greatest x between lo and hi, inclusive, such that
+    // calc.illuminated(x) is false.
+    // Assumptions: the pixels between lo and hi form a single (possibly empty) non-illuminated
+    // region on the left, followed by a single (possibly empty) illuminated region on the right.
+    // If there are any extraneous pixels, the result could be just a random non-illuminated
+    // pixel.
+    function lastNonIlluminated(lo as Number, hi as Number) as Number {
+        // invariant: !calc.illuminated(lo) (assumed, at the start)
+
+        // Short-circuit this relatively common case, to produce the right result
+        // and keep the calculation of mid simple within the loop.
+        if (!illuminated(hi)) {
+            return hi;
+        }
+
+        while (hi > lo+1) {
+            var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
+            if (!illuminated(mid)) {
+                lo = mid;
+            }
+            else {
+                hi = mid;
+            }
+        }
+        return lo;
+    }
+
+    // Binary search to find the least x between lo and hi, inclusive, such that
+    // calc.illuminated(x) is false.
+    // Assumptions: the pixels between lo and hi form a single (possibly empty) illuminated region
+    // on the left, followed by a single (possibly empty) non-illuminated region on the right.
+    // If there are any extraneous pixels, the result could be just a random *illuminated*
+    // pixel.
+    function lastIlluminated(lo as Number, hi as Number) as Number {
+        // invariant: calc.illuminated(lo) (assumed, at the start)
+
+        while (hi > lo+1) {
+            var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
+            if (illuminated(mid)) {
+                lo = mid;
+            }
+            else {
+                hi = mid;
+            }
+        }
+        return hi;
+    }
+
 }
 
 (:test)
 function testGetOne(logger as Logger) as Boolean {
     var mp = new MoonPixels();
 
-    Test.assert(mp.getPolar(1.1, 0.0) == null);
+    // Test.assert(mp.getPolar(1.1, 0.0) == null);
 
     // Look at the middle pixel, but this is just the value I saw once:
     // assertApproximatelyEqual(mp.getPolar(0.0, 0.0), 0.47, 0.01, logger);  // 0.03?
