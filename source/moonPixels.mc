@@ -152,6 +152,11 @@ class MoonPixels {
     }
 
     // Erase portions of the moon's image that are currently in shadow.
+    //
+    // In each row, test to see which portion of the pixels is visible, and use binary search
+    // to find the edge in image space. For skinny crescents, that reduces the number of
+    // ellipse calculations from a max of O(2*radius) ~= 60 to about O(log(2*radius)) ~= 8
+    // (plus an inevitable few per row).
     private function clearShadow(dc as Dc, radius as Number,
                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
         // Note: Dc.clear seems to be the only way to write transparent pixels over the top of
@@ -165,21 +170,67 @@ class MoonPixels {
 
             if (!calc.illuminated(calc.minX)) {
                 // Some pixels on the left are dark:
-                // TODO: binary search
-                var x = calc.minX+1;
-                while (x <= calc.maxX and !calc.illuminated(x)) {
-                    x += 1;
+
+                // Binary search to find the first visible pixel, if any:
+                var lo = calc.minX;  // invariant: !calc.illuminated(lo)
+                var hi = calc.maxX;
+                while (hi > lo+1) {
+                    var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
+                    if (!calc.illuminated(mid)) {
+                        lo = mid;
+                    }
+                    else {
+                        hi = mid;
+                    }
                 }
-                // x is now either maxX, or it's the first visible pixel
+
                 // Note: clear all the way to the left edge, just in case there are any stray
                 // pixels in the source image (because there are).
-                dc.setClip(0, radius + y, radius + x-1, 1);
+                var firstDarkX = -radius;
+
+                // Similarly, if the entire row is dark, and make sure to clear all the way to the
+                // right edge.
+                var lastDarkX;
+                if (hi == calc.maxX) {
+                    lastDarkX = radius;
+                }
+                else {
+                    lastDarkX = lo;
+                }
+
+                dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
                 dc.clear();
             }
-            // TODO: right side
-            // TODO: center
+            else if (!calc.illuminated(calc.maxX)) {
+                // Some pixels on the right are dark:
+                // Note: in this case, we know that minX is not dark.
 
-            // Seems possibly expensive but the only way to actually clear to transparent?
+                // Binary search to find the last dark pixel:
+                var lo = calc.minX;  // invariant: calc.illuminated(lo)
+                var hi = calc.maxX;
+                while (hi > lo+1) {
+                    var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
+                    if (calc.illuminated(mid)) {
+                        lo = mid;
+                    }
+                    else {
+                        hi = mid;
+                    }
+                }
+
+                var firstDarkX = lo;
+                // Note: clear all the way to the right edge, just in case there are any stray
+                // pixels in the source image (because there are).
+                var lastDarkX = radius;
+
+                dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
+                dc.clear();
+            }
+            else if (!calc.illuminated(0)) {
+                // Some pixels in the middle are dark (i.e. a rotated crescent):
+
+                // TODO: search twice and erase in the middle
+            }
         }
 
         dc.clearClip();
