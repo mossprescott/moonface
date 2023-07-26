@@ -59,19 +59,19 @@ class MoonPixels {
         // the values seem to be identical.
 
         rotate90 = new AffineTransform();
-        rotate90.translate(30.0, 30.0);
+        rotate90.translate(1.0*nativeRadius, 1.0*nativeRadius);
         rotate90.rotate(Math.PI/2);
-        rotate90.translate(-30.0, -30.0);
+        rotate90.translate(-1.0*nativeRadius, -1.0*nativeRadius);
 
         rotate180 = new AffineTransform();
-        rotate180.translate(30.0, 30.0);
+        rotate180.translate(1.0*nativeRadius, 1.0*nativeRadius);
         rotate180.rotate(Math.PI);
-        rotate180.translate(-30.0, -30.0);
+        rotate180.translate(-1.0*nativeRadius, -1.0*nativeRadius);
 
         rotate270 = new AffineTransform();
-        rotate270.translate(30.0, 30.0);
+        rotate270.translate(1.0*nativeRadius, 1.0*nativeRadius);
         rotate270.rotate(Math.PI*3/2);
-        rotate270.translate(-30.0, -30.0);
+        rotate270.translate(-1.0*nativeRadius, -1.0*nativeRadius);
         // System.println(rotate270.getMatrix());
     }
 
