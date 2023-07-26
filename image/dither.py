@@ -27,8 +27,8 @@ def main():
     # # Test how much detail is preserved by the dithering:
     # munge(src, 0, 500).show()
 
-    radius = 30
-    steps = 20  # Note: radius*π/2 or about radius*1.5 would be one-pixel steps around the perimeter
+    radius = 35
+    steps = 50  # Note: radius*π/2 or about radius*1.5 would be one-pixel steps around the perimeter
     for i in range(steps):
         name = f"moon{radius}-{i:02d}.png"
         img = munge(src, 90*i/steps, radius)
