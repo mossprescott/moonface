@@ -19,14 +19,13 @@ in the sky.
 ## Implementation
 
 Images of the moon are rotated, scaled, and dithered to the MiP 64-color palette at build time,
-including an image for each step of rotating through 90 degrees. On each update, the appropriate
-image is chosen, rendered into an offscreen buffer (with rotation in ncrements of 90°), and then
+including an image for each step of rotating through 90°. On each update, the appropriate image
+is chosen, rendered into an offscreen buffer (with rotation in increments of 90°), and then
 the "dark" portion of the disk is erased.
 
 That erasing now turns out to be the bottleneck, with lots of geometry to find the exact pixel
-boundaries of the moon's image for each row of the image, and then a `Dc.clear()` call.
-
-The actual drawing is relatively quick, even with a rotation and scale transform involved.
+boundaries of the moon's image for each row of the image, and then a `Dc.clear()` call. The actual
+bitmap drawing is relatively quick, even with a rotation and scale transform involved.
 
 
 ## Limitations
