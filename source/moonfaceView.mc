@@ -223,9 +223,10 @@ class moonfaceView extends WatchUi.WatchFace {
         var width = dc.getWidth();
         var height = dc.getHeight();
 
-        dc.setColor(palette.sky, palette.below);
-        dc.clear();
+        dc.setColor(palette.sky, -1);
         dc.fillRectangle(0, 0, width, height/2);
+        dc.setColor(palette.below, -1);
+        dc.fillRectangle(0, height/2, width, height/2);
     }
 
     // Draw the current time, either above or below the horizon depending on whether the moon is up.
