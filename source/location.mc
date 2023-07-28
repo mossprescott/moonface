@@ -56,9 +56,9 @@ class Location3 {
             altitude != null ? altitude.format("%0.0f") : "?",
         ]);
     }
+}
 
-
-
+class Locations {
     // Get the best available location, by checking two sources of "current" (recent) location,
     // or else loading a saved location from storage. If no location has ever been available, then
     // null.
@@ -73,16 +73,16 @@ class Location3 {
         return loc;
     }
 
-    private static function writeStoredLocation(loc /*as Location3*/) as Void {
+    private static function writeStoredLocation(loc as Location3) as Void {
         Storage.setValue(LOCATION_KEY, {
             LATITUDE_FIELD => loc.latitude,
             LONGITUDE_FIELD => loc.longitude,
             ALTITUDE_FIELD => loc.altitude
-        });
+        } as Dictionary<String, Float>);
     }
 
     private static function readStoredLocation() as Location3 or Null {
-        var stored = erase(Storage.getValue(LOCATION_KEY));
+        var stored = Storage.getValue(LOCATION_KEY) as Dictionary<String, Float>?;
         if (stored != null) {
             // TODO: parse from the dictionary, handling unexpected values in some consistent way
             System.println(Lang.format("Location from storage: $1$", [stored]));
@@ -96,9 +96,6 @@ class Location3 {
         return null;
     }
 
-    // Erase a type that confuses the type checker.
-    private static function erase(x) { return x; }
-
     // See https://forums.garmin.com/developer/connect-iq/f/discussion/305484/how-best-to-get-a-gps-location-in-a-watch-face
     private static function latestLocation() as Location3 or Null {
         // First try looking for a recently completed activity. This will give an accurate location
@@ -106,7 +103,7 @@ class Location3 {
         var loc = null;
         var altitude = null;
 
-        var activity = erase(Activity.getActivityInfo());
+        var activity = Activity.getActivityInfo();
         if (activity != null) {
             System.println("Activity present");
             if (activity.currentLocation != null) {
@@ -119,7 +116,7 @@ class Location3 {
         if (loc == null) {
             var weather = Weather.getCurrentConditions();
             if (weather != null) {
-                loc = erase(weather).observationLocationPosition;
+                loc = weather.observationLocationPosition;
                 // Note: altitude not provided
                 // TODO: maybe use a stored altitude as an approximate value, if the position
                 // is otherwise fairly close.
@@ -135,7 +132,7 @@ class Location3 {
                 System.println(Lang.format("Pinning negative altitude: $1$m", [altitude.format("%0.1f")]));
                 altitude = 0;
             }
-            var result = new Location3(latitude, longitude, altitude);
+            var result = new Location3(latitude, longitude, altitude != null ? altitude.toFloat() : null);
             System.println(result);
             return result;
         }

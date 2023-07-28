@@ -134,7 +134,7 @@ class moonfaceView extends WatchUi.WatchFace {
                 location = Kangiqsujuaq;
                 break;
             default:
-                location = Location3.getLocation();
+                location = Locations.getLocation();
                 if (location == null) { location = Hamden; }
                 else if (location.altitude == null) { location.altitude = 0.0; }
                 break;
