@@ -19,10 +19,10 @@ class Location3 {
     public var longitude as Float;
     public var altitude as Float or Null;
 
-    function initialize(latitude as Float, longitude as Float, altitude as Float) {
-        self.latitude = latitude;
-        self.longitude = longitude;
-        self.altitude = altitude;
+    function initialize(latitude as Decimal, longitude as Decimal, altitude as Decimal?) {
+        self.latitude = latitude.toFloat();
+        self.longitude = longitude.toFloat();
+        self.altitude = altitude != null ? altitude.toFloat() : null;
     }
 
     // Distance between 2 locations, assuming a spherical globe and ignoring altitiude.
