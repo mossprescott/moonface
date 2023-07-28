@@ -28,8 +28,6 @@ class moonfaceView extends WatchUi.WatchFace {
 
     var theme as MFColors.Theme;
 
-    var location as Location3?;
-
     // Cache some state between draw calls:
     var isSunUp as Boolean = true;
     var palette as MFColors.Palette;
@@ -64,9 +62,9 @@ class moonfaceView extends WatchUi.WatchFace {
         // System.println("onUpdate()");
 
         readProperties();
-        readLocation();
+        var loc = readLocation();
 
-        drawAll(dc, false);
+        drawAll(dc, loc, false);
     }
 
     // Called when this View is removed from the screen. Save the
@@ -94,7 +92,8 @@ class moonfaceView extends WatchUi.WatchFace {
 
         System.println("onPartialUpdate()");
         if (showSeconds) {
-            drawAll(dc, true);
+            var loc = readLocation();
+            drawAll(dc, loc, true);
         }
     }
 
@@ -116,32 +115,33 @@ class moonfaceView extends WatchUi.WatchFace {
         }
     }
 
-    private function readLocation() as Void {
+    private function readLocation() as Location3 {
         switch (Properties.getValue("LocationOption") as LocationOption) {
             case hamden:
-                location = Hamden;
-                break;
+                return Hamden;
             case newOrleans:
-                location = NewOrleans;
-                break;
+                return NewOrleans;
             case santiago:
-                location = Santiago;
-                break;
+                return Santiago;
             case pacoa:
-                location = Pacoa;
-                break;
+                return Pacoa;
             case kangiqsujuaq:
-                location = Kangiqsujuaq;
-                break;
+                return Kangiqsujuaq;
             default:
-                location = Locations.getLocation();
-                if (location == null) { location = Hamden; }
-                else if (location.altitude == null) { location.altitude = 0.0; }
-                break;
+                var location = Locations.getLocation();
+                if (location == null) {
+                    return Hamden;
+                }
+                else {
+                    if (location.altitude == null) {
+                        location.altitude = 0.0;
+                    }
+                    return location;
+                }
         }
     }
 
-    private function drawAll(dc as Dc, secondsOnly as Boolean) as Void {
+    private function drawAll(dc as Dc, location as Location3, secondsOnly as Boolean) as Void {
         var frameStart = System.getTimer();
         frameCount += 1;
 
