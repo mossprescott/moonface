@@ -151,6 +151,15 @@ class moonfaceView extends WatchUi.WatchFace {
         // UTC time for astronomical calculations:
         var now = Time.now();
 
+        var sunTrack = getSunTrack(location, Time.today());
+
+        // Note: this doesn't really work for equatorial latitudes, especially when the moon is
+        // fairly full. In that case, the moon can be in the north while the sun is in the south,
+        // and vice versa, even when both are in the sky (e.g. sun is WSW while the moon is ENE).
+        // Then, after sunset, the sun is below the horizon, the moon is up, but it doesn't appear
+        // on the watchface.
+        var facingSouth = sunTrack.isInSouthernSky();
+
         if (!secondsOnly) {
             // TODO: redraw only seconds when appropriate? Or request one update per minute?
 
@@ -170,10 +179,11 @@ class moonfaceView extends WatchUi.WatchFace {
             // Draw indices, numerals, and the sun itself
             // drawSunTrack(dc, sunrise, sunset, localNow);
 
-            drawSunTrackOffDial(dc, getSunTrack(location, Time.today()));
+            drawSunTrackOffDial(dc, sunTrack, facingSouth);
 
             dc.setAntiAlias(true);
-            drawSun(dc, sunPosition.get(:azimuth) as Decimal, sunPosition.get(:altitude) as Decimal);
+            drawSun(dc, sunPosition.get(:azimuth) as Decimal, sunPosition.get(:altitude) as Decimal,
+                facingSouth);
             dc.setAntiAlias(false);
         }
 
@@ -183,7 +193,7 @@ class moonfaceView extends WatchUi.WatchFace {
 
         // Indicating direction reference for what view of the sky we're dealing with.
         // Drawn after the time, which can overlap it slightly
-        drawCompass(dc);
+        drawCompass(dc, facingSouth);
 
         // The moon can overlap the time when it's low in the sky and close to full.
         var moonPosition = Orbits.moonPosition(now, location);
@@ -192,7 +202,8 @@ class moonfaceView extends WatchUi.WatchFace {
         // System.println(moonIllumination);
         drawMoon(dc, moonPosition.get(:azimuth), moonPosition.get(:altitude),
                 moonPosition.get(:parallacticAngle),
-                moonIllumination.get(:fraction), moonIllumination.get(:phase));
+                moonIllumination.get(:fraction), moonIllumination.get(:phase),
+                facingSouth);
 
         dc.setColor(palette.time, -1);
 
@@ -318,8 +329,8 @@ class moonfaceView extends WatchUi.WatchFace {
     // Draw an index at the location of the sun at each hour of the day.
     // Note: small circles render very slowly if anti-aliased, and very ugly if not. Squares look
     // decent and render fast. Some kind of middle ground is probably possible.
-    private function drawSunTrackOffDial(dc as Dc, track as SunTrack) as Void {
-        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
+    private function drawSunTrackOffDial(dc as Dc, track as SunTrack, facingSouth as Boolean) as Void {
+        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight(), facingSouth);
 
         dc.setColor(palette.index, COLOR_NONE);
 
@@ -340,13 +351,8 @@ class moonfaceView extends WatchUi.WatchFace {
         }
     }
 
-    // TODO: deal with viewer looking to the north
-    private function drawCompass(dc as Dc) as Void {
-        var EAST = -Math.PI/2;
-        var SOUTH = 0.0;
-        var WEST = Math.PI/2;
-
-        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
+    private function drawCompass(dc as Dc, facingSouth as Boolean) as Void {
+        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight(), facingSouth);
 
         var horizon = palette.horizon;
         if (horizon != null) {
@@ -357,30 +363,21 @@ class moonfaceView extends WatchUi.WatchFace {
 
         dc.setColor(palette.compass, COLOR_NONE);
 
-        skyCalc.setPosition(EAST, 0.0);
-        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
-        dc.drawText(skyCalc.x(), skyCalc.y() + 10, Graphics.FONT_XTINY, "E",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        var labels = ["S", null, null, "W", null, null, "N", null, null, "E", null, null] as Array<String?>;
 
-        skyCalc.setPosition((2*EAST + SOUTH)/3, 0.0);
-        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
-        skyCalc.setPosition((EAST + 2*SOUTH)/3, 0.0);
-        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
-
-        skyCalc.setPosition(SOUTH, 0.0);
-        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
-        dc.drawText(skyCalc.x(), skyCalc.y() + 10, Graphics.FONT_XTINY, "S",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        skyCalc.setPosition((2*SOUTH + WEST)/3, 0.0);
-        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
-        skyCalc.setPosition((SOUTH + 2*WEST)/3, 0.0);
-        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
-
-        skyCalc.setPosition(WEST, 0.0);
-        dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
-        dc.drawText(skyCalc.x(), skyCalc.y() + 10, Graphics.FONT_XTINY, "W",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        for (var i = 0; i < 12; i += 1) {
+            skyCalc.setPosition(i*Math.PI/6, 0.0);
+            // FIXME: supress the ticks that lie outside E/W. They tend to overlap the sun track
+            // indices and look busy. Or maybe just adjust the scaling to make them end up off screen.
+            if (skyCalc.onscreen()) {
+                dc.fillRectangle(skyCalc.x()-1, skyCalc.y(), 2, 3);
+                var str = labels[i];
+                if (str != null) {
+                    dc.drawText(skyCalc.x(), skyCalc.y() + 10, Graphics.FONT_XTINY, str,
+                                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                }
+            }
+        }
     }
 
     // Draw the sun in the sky in the same projection as the moon. This probably makes more sense as an
@@ -388,8 +385,8 @@ class moonfaceView extends WatchUi.WatchFace {
     // appearance understandable.
     // azimuth: radians with 0 at north
     // altitude: radians with 0 at the horizon
-    private function drawSun(dc as Dc, azimuth as Float, altitude as Float) as Void {
-        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
+    private function drawSun(dc as Dc, azimuth as Float, altitude as Float, facingSouth as Boolean) as Void {
+        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight(), facingSouth);
         skyCalc.setPosition(azimuth, altitude);
 
         dc.setColor(palette.sun, COLOR_NONE);
@@ -410,8 +407,11 @@ class moonfaceView extends WatchUi.WatchFace {
     // altitude: radians with 0 at the horizon
     // parallactic: radians with 0 being "normal"
     // illumination: radians with ? being ?
-    private function drawMoon(dc as Dc, azimuth as Float, altitude as Float, parallactic as Float, illuminationFraction as Float, phase as Float) as Void {
-        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
+    private function drawMoon(dc as Dc,
+            azimuth as Float, altitude as Float, parallactic as Float,
+            illuminationFraction as Float, phase as Float,
+            facingSouth as Boolean) as Void {
+        var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight(), facingSouth);
         skyCalc.setPosition(azimuth, altitude);
 
         if (skyCalc.onscreen()) {
@@ -504,6 +504,11 @@ class SunTrack {
     // Angle in radians above the horizon, for hours between 0 and 23.
     function getAltitude(hour as Number) as Float {
         return track[hour][1];
+    }
+
+    function isInSouthernSky() as Boolean {
+        var noonAzimuth = getAzimuth(12);
+        return Math.cos(noonAzimuth) > 0;
     }
 }
 

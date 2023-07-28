@@ -18,26 +18,33 @@ import Toybox.Time;
 // on your left as you look to the south.
 class SkyCalculator {
     // 1.0 would put the sun/moon, when directly overhead, at the exact top edge at the center
-    // of the face.
+    // of the face. Chosen to make the track of the sun/moon fit in the upper semi-circle of the
+    // dial most of the time, for most latitudes.
     private var MAX_HEIGHT as Float = 0.75;
+
+    // 1.0 would put E/W at the exact edges of the screen.
+    // 0.75 puts the "4th" (120°) tick mark just at the edge of the screen.
+    // The idea here is to put that tick just *off* the screen, to reduce clutter.
+    private var MAX_WIDTH as Float = 0.76;
 
     private var width as Number;
     private var height as Number;
+    private var southFacing as Boolean;
 
     private var azimuth as Float = Math.PI;
     private var altitude as Float = 0.0;
 
-    public function initialize(width as Number, height as Number) {
+    public function initialize(width as Number, height as Number, southFacing as Boolean) {
         self.width = width;
         self.height = height;
+        self.southFacing = southFacing;
     }
 
-    // azimuth: radians with 0 at north/south(?!)
+    // azimuth: radians with 0 being due south
     // altitude: radians with 0 at the horizon
     public function setPosition(azimuth as Float, altitude as Float) as Void {
         self.azimuth = azimuth;
         self.altitude = altitude;
-        // System.println(Lang.format("$1$, $2$", [azimuth, altitude]));
     }
 
     // Is the point onscreen, assuming a circular display?
@@ -49,13 +56,36 @@ class SkyCalculator {
     }
 
     public function x() as Number {
-        return width/2 + Math.round((width/3)*azimuth/(Math.PI/2)).toNumber();
+        var scale = MAX_WIDTH*(width/2);
+        return width/2 + Math.round(scale*xFraction()).toNumber();
     }
 
     public function y() as Number {
-        // var fraction = altitude/(Math.PI/2);
-        var fraction = Math.sin(altitude);
-        return height/2 - Math.round((height/2)*MAX_HEIGHT*fraction).toNumber();
+        var scale = MAX_HEIGHT*(height/2);
+        return height/2 - Math.round(scale*yFraction()).toNumber();
+    }
+
+    // Unitless value between -2 (when the point is furthest to the left) and 2 (when the point
+    // is furthest to the right). Values of +/- 1.0 represent due east and due west, i.e. near the left
+    // and right edges of the screen.
+    private function xFraction() as Float {
+        var center = southFacing ? 0 : Math.PI;
+        var fraction = (azimuth - center)/(2*Math.PI);
+        while (fraction <= -0.5) { fraction += 1.0; }
+        while (fraction >= 0.5) { fraction -= 1.0; }
+        return 4*fraction;
+    }
+
+    // Unitless value between -1 (when the point is directly below) and 1 (when the point is
+    // directly overhead).
+    private function yFraction() as Float {
+        // "Flat" projection. Tends to produce a lower arc, unless the sun is really directly
+        // overhead:
+        return altitude/(Math.PI/2);
+
+        // Project with sine. Tends to make a squarer arc, pushing the "corners" of the sun's
+        // track further towards the edge of the display:
+        // return Math.sin(altitude);
     }
 
     // If the point is offscreen, this is the x-coord of the nearest point at the left or right edge
@@ -64,10 +94,10 @@ class SkyCalculator {
         var y = y() - height/2;
         var r = width/2;
         if (x() < width/2) {
-            return width/2 - Math.round(Math.sqrt(r*r - y*y));
+            return width/2 - Math.round(Math.sqrt(r*r - y*y)).toNumber();
         }
         else {
-            return width/2 + Math.round(Math.sqrt(r*r - y*y));
+            return width/2 + Math.round(Math.sqrt(r*r - y*y)).toNumber();
         }
     }
 }
