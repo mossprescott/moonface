@@ -42,7 +42,7 @@ class Location3 {
         return dSigma * rEarth;
     }
 
-    function haversine(x as Float) as Float {
+    private static function haversine(x as Float) as Float {
         var s = Math.sin(x/2) as Float;
         return s*s;
     }
