@@ -421,8 +421,8 @@ function testSunPosition(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
 
     var pos = Orbits.sunPosition(april17, Hamden);
-    assertApproximatelyEqual(pos.get(:azim), 0.5736, 0.01, logger);
-    assertApproximatelyEqual(pos.get(:alt), 0.9617, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:azim) as Float, 0.5736, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:alt) as Float, 0.9617, 0.01, logger);
 
     // Note: the actual error is something like 0.5%, which seems OK if not great.
 
@@ -435,10 +435,10 @@ function testSunTimes(logger as Logger) as Boolean {
 
     var times = Orbits.sunTimes(midnight, Hamden);
 
-    assertEqualLog(formatTime(times.get(:noon)),  "2023-04-17 12:52", logger);
-    assertEqualLog(formatTime(times.get(:nadir)), "2023-04-17 00:52", logger);
-    assertEqualLog(formatTime(times.get(:rise)),  "2023-04-17 06:09", logger);
-    assertEqualLog(formatTime(times.get(:set)),   "2023-04-17 19:35", logger);
+    assertEqualLog(formatTime(times.get(:noon) as Moment),  "2023-04-17 12:52", logger);
+    assertEqualLog(formatTime(times.get(:nadir) as Moment), "2023-04-17 00:52", logger);
+    assertEqualLog(formatTime(times.get(:rise) as Moment),  "2023-04-17 06:09", logger);
+    assertEqualLog(formatTime(times.get(:set) as Moment),   "2023-04-17 19:35", logger);
 
     return true;
 }
@@ -452,10 +452,10 @@ function testSunTimes2(logger as Logger) as Boolean {
 
     var times = Orbits.sunTimes(midnight, guadalajara);
 
-    assertEqualLog(formatTime(times.get(:noon)),  "2023-08-15 14:59", logger);  // Actual: 14:57
-    assertEqualLog(formatTime(times.get(:nadir)), "2023-08-15 02:59", logger);
-    assertEqualLog(formatTime(times.get(:rise)),  "2023-08-15 08:33", logger);  // Actual: 08:32
-    assertEqualLog(formatTime(times.get(:set)),   "2023-08-15 21:24", logger);  // Actual: 21:22
+    assertEqualLog(formatTime(times.get(:noon) as Moment),  "2023-08-15 14:59", logger);  // Actual: 14:57
+    assertEqualLog(formatTime(times.get(:nadir) as Moment), "2023-08-15 02:59", logger);
+    assertEqualLog(formatTime(times.get(:rise) as Moment),  "2023-08-15 08:33", logger);  // Actual: 08:32
+    assertEqualLog(formatTime(times.get(:set) as Moment),   "2023-08-15 21:24", logger);  // Actual: 21:22
 
     return true;
 }
@@ -465,10 +465,10 @@ function testMoonPosition(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
 
     var pos = Orbits.moonPosition(april17, Hamden);
-    assertApproximatelyEqual(pos.get(:azim),          0.9277, 0.01, logger);
-    assertApproximatelyEqual(pos.get(:alt),         0.5089, 0.01, logger);
-    assertApproximatelyEqual(pos.get(:dist),      369507.90,  1.0, logger);
-    assertApproximatelyEqual(pos.get(:parallacticAngle), 0.6464, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:azim) as Float,             0.9277,    0.01, logger);
+    assertApproximatelyEqual(pos.get(:alt) as Float,              0.5089,    0.01, logger);
+    assertApproximatelyEqual(pos.get(:dist) as Float,             369507.90, 1.0,  logger);
+    assertApproximatelyEqual(pos.get(:parallacticAngle) as Float, 0.6464,    0.01, logger);
 
     return true;
 }
@@ -478,9 +478,9 @@ function testMoonIllumination(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
 
     var pos = Orbits.moonIllumination(april17);
-    assertApproximatelyEqual(pos.get(:fraction), 0.06630, 0.0001, logger);
-    assertApproximatelyEqual(pos.get(:phase),    0.9171,  0.0001, logger);
-    assertApproximatelyEqual(pos.get(:angle),    1.057,   0.001, logger);
+    assertApproximatelyEqual(pos.get(:fraction) as Float, 0.06630, 0.0001, logger);
+    assertApproximatelyEqual(pos.get(:phase) as Float,    0.9171,  0.0001, logger);
+    assertApproximatelyEqual(pos.get(:angle) as Float,    1.057,   0.001,  logger);
 
     return true;
 }
@@ -493,7 +493,7 @@ function formatTime(time as Moment) as String {
         "$1$-$2$-$3$ $4$:$5$",
         [
             today.year,
-            today.month.format("%02d"),
+            (today.month as Number).format("%02d"),
             today.day.format("%02d"),
             today.hour.format("%02d"),
             today.min.format("%02d"),

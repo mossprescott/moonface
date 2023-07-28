@@ -443,7 +443,7 @@ class MoonFaceCalculator {
 
 (:test)
 function testGetOne(logger as Logger) as Boolean {
-    var mp = new MoonPixels();
+    // var mp = new MoonPixels();
 
     // Test.assert(mp.getPolar(1.1, 0.0) == null);
 
