@@ -177,16 +177,17 @@ class moonfaceView extends WatchUi.WatchFace {
             dc.setAntiAlias(false);
         }
 
+        // FIXME: at extreme latitudes, this can overlap the sun track as well, so ideally would
+        // be drawn earlier, but that means more work on "seconds only" updates.
         drawTime(dc, clockTime);
 
         // Indicating direction reference for what view of the sky we're dealing with.
         // Drawn after the time, which can overlap it slightly
         drawCompass(dc);
 
-        // The moon can overlap the time when it's low in the sky and close to full. And its
-        // drawing is optimized anyway, so almost always fast on "seconds" updates.
+        // The moon can overlap the time when it's low in the sky and close to full.
         var moonPosition = Orbits.moonPosition(now, location);
-        // TODO: don't recalculate the illumination every time since we only redraw periodically
+        // TODO: don't recalculate the illumination every time
         var moonIllumination = Orbits.moonIllumination(now);
         // System.println(moonIllumination);
         drawMoon(dc, moonPosition.get(:azimuth), moonPosition.get(:altitude),
