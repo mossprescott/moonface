@@ -28,7 +28,7 @@ class moonfaceApp extends Application.AppBase {
     }
 
     function getSettingsView() {
-        return [new SettingsMenu(), new SettingsMenuDelegate()];
+        return [new SettingsMenu(), new SettingsMenuDelegate()] as Array<Menu2 or Menu2InputDelegate>;
     }
 }
 
