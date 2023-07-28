@@ -34,7 +34,7 @@ class Location3 {
 
         var dSigma = 2.0*Math.asin(Math.sqrt(
             haversine(dPhi) +
-            (1 - haversine(dPhi) - haversine(sumPhi))*haversine(dLambda)));
+            (1 - haversine(dPhi) - haversine(sumPhi))*haversine(dLambda))) as Float;
 
         // Mean radius of the earth. This is pretty darn close for moderate latitudes, and within
         // 1% everywhere.
@@ -42,8 +42,8 @@ class Location3 {
         return dSigma * rEarth;
     }
 
-    function haversine(x as Decimal) as Decimal {
-        var s = Math.sin(x/2);
+    function haversine(x as Float) as Float {
+        var s = Math.sin(x/2) as Float;
         return s*s;
     }
 
