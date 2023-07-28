@@ -132,10 +132,10 @@ class Orbits {
 
 
     // Viewer-relative position of the sun at a moment in time.
-    // :azimuth => south = 0.
-    // :altitude => horizon = 0.
+    // :azim => south = 0.
+    // :alt => horizon = 0.
     public static function sunPosition(time as Moment, loc as Location3)
-            as { :azimuth as Float, :altitude as Float } {
+            as { :azim as Float, :alt as Float } {
         var lw  = -loc.longitude as Float;
         var phi = loc.latitude;
         var d   = toDays(time);
@@ -144,8 +144,8 @@ class Orbits {
         var H  = siderealTime(d, lw) - (c[:ra] as Float);
 
         return {
-            :azimuth => azimuth(H, phi, c[:dec] as Float),
-            :altitude => altitude(H, phi, c[:dec] as Float),
+            :azim => azimuth(H, phi, c[:dec] as Float),
+            :alt => altitude(H, phi, c[:dec] as Float),
         };
     }
 
@@ -249,9 +249,9 @@ class Orbits {
     }
 
     // Position of the moon in the sky, given the viewer's location.
-    // { :azimuth, :altitude, :distance (km), :parallacticAngle }
+    // { :azim, :alt, :distance (km), :parallacticAngle }
     public static function moonPosition(date as Moment, loc as Location3)
-            as { :azimuth as Float, :altitude as Float, :distance as Float, :parallacticAngle as Float } {
+            as { :azim as Float, :alt as Float, :dist as Float, :parallacticAngle as Float } {
         var lw  = -loc.longitude;
         var phi = loc.latitude;
         var d   = toDays(date);
@@ -265,9 +265,9 @@ class Orbits {
         var correctedH = h + astroRefraction(h); // altitude correction for refraction
 
         return {
-            :azimuth => azimuth(H, phi, c[:dec] as Float),
-            :altitude => correctedH,
-            :distance => c[:dist] as Float,
+            :azim => azimuth(H, phi, c[:dec] as Float),
+            :alt => correctedH,
+            :dist => c[:dist] as Float,
             :parallacticAngle => pa,
         };
     }
@@ -421,8 +421,8 @@ function testSunPosition(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
 
     var pos = Orbits.sunPosition(april17, Hamden);
-    assertApproximatelyEqual(pos.get(:azimuth), 0.5736, 0.01, logger);
-    assertApproximatelyEqual(pos.get(:altitude), 0.9617, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:azim), 0.5736, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:alt), 0.9617, 0.01, logger);
 
     // Note: the actual error is something like 0.5%, which seems OK if not great.
 
@@ -465,9 +465,9 @@ function testMoonPosition(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
 
     var pos = Orbits.moonPosition(april17, Hamden);
-    assertApproximatelyEqual(pos.get(:azimuth),          0.9277, 0.01, logger);
-    assertApproximatelyEqual(pos.get(:altitude),         0.5089, 0.01, logger);
-    assertApproximatelyEqual(pos.get(:distance),      369507.90,  1.0, logger);
+    assertApproximatelyEqual(pos.get(:azim),          0.9277, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:alt),         0.5089, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:dist),      369507.90,  1.0, logger);
     assertApproximatelyEqual(pos.get(:parallacticAngle), 0.6464, 0.01, logger);
 
     return true;

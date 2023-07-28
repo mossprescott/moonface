@@ -182,7 +182,7 @@ class moonfaceView extends WatchUi.WatchFace {
             drawSunTrackOffDial(dc, sunTrack, facingSouth);
 
             dc.setAntiAlias(true);
-            drawSun(dc, sunPosition.get(:azimuth) as Decimal, sunPosition.get(:altitude) as Decimal,
+            drawSun(dc, sunPosition.get(:azim) as Float, sunPosition.get(:alt) as Float,
                 facingSouth);
             dc.setAntiAlias(false);
         }
@@ -200,8 +200,8 @@ class moonfaceView extends WatchUi.WatchFace {
         // TODO: don't recalculate the illumination every time
         var moonIllumination = Orbits.moonIllumination(now);
         // System.println(moonIllumination);
-        drawMoon(dc, moonPosition.get(:azimuth), moonPosition.get(:altitude),
-                moonPosition.get(:parallacticAngle),
+        drawMoon(dc, moonPosition[:azim] as Float, moonPosition[:alt] as Float,
+                moonPosition[:parallacticAngle] as Float,
                 moonIllumination.get(:fraction), moonIllumination.get(:phase),
                 facingSouth);
 
@@ -492,7 +492,7 @@ class SunTrack {
         for (var h = 0; h < 24; h += 1) {
             var t = midnight.add(new Duration(h*60*60));
             var pos = Orbits.sunPosition(t, loc);
-            track.add([pos.get(:azimuth), pos.get(:altitude)] as Array<Float>);
+            track.add([pos.get(:azim), pos.get(:alt)] as Array<Float>);
         }
     }
 
