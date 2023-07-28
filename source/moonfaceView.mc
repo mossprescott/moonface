@@ -202,7 +202,7 @@ class moonfaceView extends WatchUi.WatchFace {
         // System.println(moonIllumination);
         drawMoon(dc, moonPosition[:azim] as Float, moonPosition[:alt] as Float,
                 moonPosition[:parallacticAngle] as Float,
-                moonIllumination.get(:fraction), moonIllumination.get(:phase),
+                moonIllumination[:fraction] as Float, moonIllumination[:phase] as Float,
                 facingSouth);
 
         dc.setColor(palette.time, -1);
@@ -217,11 +217,9 @@ class moonfaceView extends WatchUi.WatchFace {
         }
 
         // Coords:
-        if (location != null) {
-            dc.drawText(dc.getWidth()/2, dc.getHeight()-30, Graphics.FONT_XTINY,
-                location.toString(),
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
+        dc.drawText(dc.getWidth()/2, dc.getHeight()-30, Graphics.FONT_XTINY,
+            location.toString(),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var frameEnd = System.getTimer();
 

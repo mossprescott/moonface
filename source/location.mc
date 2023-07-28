@@ -47,7 +47,7 @@ class Location3 {
         return s*s;
     }
 
-    function toString() {
+    function toString() as String {
         return Lang.format("$1$°$2$ $3$°$4$ $5$m", [
             (latitude.abs()*180/Math.PI).format("%0.1f"),
             latitude < 0 ? "S" : "N",
