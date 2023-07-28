@@ -35,6 +35,9 @@
             <listEntry value="0">@Strings.LocationOptionAuto</listEntry>
             <listEntry value="1">@Strings.LocationOptionHamden</listEntry>
             <listEntry value="2">@Strings.LocationOptionNewOrleans</listEntry>
+            <listEntry value="3">@Strings.LocationOptionSantiago</listEntry>
+            <listEntry value="4">@Strings.LocationOptionPacoa</listEntry>
+            <listEntry value="5">@Strings.LocationOptionKangiqsujuaq</listEntry>
         </settingConfig>
     </setting>
 

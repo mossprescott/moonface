@@ -13,7 +13,11 @@ enum MenuId {
 enum LocationOption {
     auto=0,
     hamden,
-    newOrleans
+    newOrleans,
+    // For testing, some more cities with similar longitude:
+    santiago,    // In the southern hemisphere
+    pacoa,       // Near the equator
+    kangiqsujuaq // Near the Arctic Circle
 }
 
 enum ThemeOption {
@@ -27,6 +31,9 @@ const LocationOptionLabels = [
         WatchUi.loadResource(Rez.Strings.LocationOptionAuto),
         WatchUi.loadResource(Rez.Strings.LocationOptionHamden),
         WatchUi.loadResource(Rez.Strings.LocationOptionNewOrleans),
+        WatchUi.loadResource(Rez.Strings.LocationOptionSantiago),
+        WatchUi.loadResource(Rez.Strings.LocationOptionPacoa),
+        WatchUi.loadResource(Rez.Strings.LocationOptionKangiqsujuaq),
     ] as Array<String>;
 
 const ThemeLabels = [
@@ -76,7 +83,7 @@ class SettingsMenuDelegate extends Menu2InputDelegate {
                 break;
             case locationOptionId:
                 var oldLoc = Properties.getValue("LocationOption") as Number;
-                var newLoc = (oldLoc + 1) % 3;
+                var newLoc = (oldLoc + 1) % 6;
                 Properties.setValue("LocationOption", newLoc);
                 item.setSubLabel(LocationOptionLabels[newLoc]);
                 break;

@@ -9,6 +9,9 @@
     <string id="LocationOptionAuto">Auto</string>
     <string id="LocationOptionHamden">Hamden</string>
     <string id="LocationOptionNewOrleans">New Orleans</string>
+    <string id="LocationOptionSantiago">Santiago</string>
+    <string id="LocationOptionPacoa">Pacoa</string>
+    <string id="LocationOptionKangiqsujuaq">Kangiqsujuaq</string>
 
     <string id="ThemeTitle">Theme</string>
     <string id="ThemeColorful">Colorful</string>

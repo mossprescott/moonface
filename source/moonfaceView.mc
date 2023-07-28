@@ -15,6 +15,9 @@ const TRACK_WIDTH as Number = 15;
 
 const Hamden as Location3 = new Location3(Orbits.toRadians(41.3460), Orbits.toRadians(-72.9125), 30.0);
 const NewOrleans as Location3 = new Location3(Orbits.toRadians(29.97), Orbits.toRadians(-90.3), 1.0);
+const Santiago as Location3 = new Location3(Orbits.toRadians(-33.47), Orbits.toRadians(-70.79), 570.0);
+const Pacoa as Location3 = new Location3(Orbits.toRadians(0.0456), Orbits.toRadians(-71.25), 100.0);
+const Kangiqsujuaq  as Location3 = new Location3(Orbits.toRadians(61.601), Orbits.toRadians(-72.06), 10.0);
 
 
 class moonfaceView extends WatchUi.WatchFace {
@@ -120,6 +123,15 @@ class moonfaceView extends WatchUi.WatchFace {
                 break;
             case newOrleans:
                 location = NewOrleans;
+                break;
+            case santiago:
+                location = Santiago;
+                break;
+            case pacoa:
+                location = Pacoa;
+                break;
+            case kangiqsujuaq:
+                location = Kangiqsujuaq;
                 break;
             default:
                 location = Location3.getLocation();
