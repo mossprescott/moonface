@@ -103,7 +103,7 @@ class SkyCalculator {
 
 (:test)
 function testSky(logger as Logger) as Boolean {
-    var calc = new SkyCalculator(260, 260);
+    var calc = new SkyCalculator(260, 260, true);
 
     calc.setPosition(0.0, 0.0);
     assertEqualLog(calc.x(), 130, logger);
@@ -111,13 +111,13 @@ function testSky(logger as Logger) as Boolean {
 
     // Due east, fairly high in the sky:
     calc.setPosition(-Math.PI/2, Math.PI/3);
-    assertEqualLog(calc.x(), 44, logger);
-    assertEqualLog(calc.y(), 46, logger);
+    assertEqualLog(calc.x(), 31, logger);
+    assertEqualLog(calc.y(), 65, logger);
 
     // Due southwest, low in the sky:
     calc.setPosition(Math.PI/4, Math.PI/6);
-    assertEqualLog(calc.x(), 173, logger);
-    assertEqualLog(calc.y(), 81, logger);
+    assertEqualLog(calc.x(), 179, logger);
+    assertEqualLog(calc.y(), 98, logger);
 
     // TODO: what about values outside (-pi/2, pi/2)?
 
