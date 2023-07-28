@@ -4,6 +4,7 @@ import Toybox.Lang;
 using Toybox.Math;
 using Toybox.System;
 using Toybox.Weather;
+using Toybox.Test;
 
 const LOCATION_KEY = "location";
 const LATITUDE_FIELD = "latitude";
@@ -22,6 +23,28 @@ class Location3 {
         self.latitude = latitude;
         self.longitude = longitude;
         self.altitude = altitude;
+    }
+
+    // Distance between 2 locations, assuming a spherical globe and ignoring altitiude.
+    // See https://en.wikipedia.org/wiki/Great-circle_distance
+    function greatCircleDistance(other as Location3) as Float {
+        var dLambda = longitude - other.longitude;
+        var dPhi = latitude - other.latitude;
+        var sumPhi = latitude + other.latitude;
+
+        var dSigma = 2.0*Math.asin(Math.sqrt(
+            haversine(dPhi) +
+            (1 - haversine(dPhi) - haversine(sumPhi))*haversine(dLambda)));
+
+        // Mean radius of the earth. This is pretty darn close for moderate latitudes, and within
+        // 1% everywhere.
+        var rEarth = 6371.009*1000.0;
+        return dSigma * rEarth;
+    }
+
+    function haversine(x as Decimal) as Decimal {
+        var s = Math.sin(x/2);
+        return s*s;
     }
 
     function toString() {
@@ -120,4 +143,24 @@ class Location3 {
             return null;
         }
     }
+}
+
+(:test)
+function testDistance(logger as Test.Logger) as Boolean {
+    // About 1245 miles, or 2004 km
+    assertApproximatelyEqual(
+        Hamden.greatCircleDistance(NewOrleans),
+        2004*1000.0,
+        10*1000.0,
+        logger);
+
+    // A little less than 3 miles, or 4.5 km, for these particular locations.
+    var newHaven = new Location3(Orbits.toRadians(41.31), Orbits.toRadians(-72.923611), 18.0);
+    assertApproximatelyEqual(
+        Hamden.greatCircleDistance(newHaven),
+        4.5*1000.0,
+        0.5*1000.0,
+        logger);
+
+    return true;
 }

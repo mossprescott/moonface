@@ -32,6 +32,8 @@ class moonfaceView extends WatchUi.WatchFace {
     var palette as MFColors.Palette;
     var frameCount as Number = 0;
 
+    var lastSunTrack as SunTrack?;
+
     function initialize() {
         WatchFace.initialize();
 
@@ -56,7 +58,7 @@ class moonfaceView extends WatchUi.WatchFace {
     function onUpdate(dc as Dc) as Void {
         moonfaceApp.throttle.updateStarted();
 
-        System.println("onUpdate()");
+        // System.println("onUpdate()");
 
         readProperties();
         readLocation();
@@ -68,7 +70,6 @@ class moonfaceView extends WatchUi.WatchFace {
     // state of this View here. This includes freeing resources from
     // memory.
     function onHide() as Void {
-        // TODO: dump the moon bitmap? or the strong reference to it
     }
 
     // The user has just looked at their watch.
@@ -157,7 +158,7 @@ class moonfaceView extends WatchUi.WatchFace {
             // Draw indices, numerals, and the sun itself
             // drawSunTrack(dc, sunrise, sunset, localNow);
 
-            drawSunTrackOffDial(dc, location, Time.today());
+            drawSunTrackOffDial(dc, getSunTrack(location, Time.today()));
 
             dc.setAntiAlias(true);
             drawSun(dc, sunPosition.get(:azimuth) as Decimal, sunPosition.get(:altitude) as Decimal);
@@ -283,18 +284,34 @@ class moonfaceView extends WatchUi.WatchFace {
     //    // }
     // }
 
+    // Check for a saved SunTrack that's still accurate, otherwise construct an up-to-date track
+    // and cache it for next time.
+    private function getSunTrack(location as Location3, midnight as Moment) as SunTrack {
+        var saved = lastSunTrack;
+        if (saved != null
+            and midnight.compare(saved.midnight) == 0
+            and location.greatCircleDistance(saved.loc) <= 5000.0)
+        {
+            return saved;
+        }
+        else {
+            System.println("Calculating sun track");
+            var newTrack = new SunTrack(location, midnight);
+            lastSunTrack = newTrack;
+            return newTrack;
+        }
+    }
+
     // Draw an index at the location of the sun at each hour of the day.
     // Note: small circles render very slowly if anti-aliased, and very ugly if not. Squares look
     // decent and render fast. Some kind of middle ground is probably possible.
-    private function drawSunTrackOffDial(dc as Dc, loc as Location3, midnight as Moment) as Void {
+    private function drawSunTrackOffDial(dc as Dc, track as SunTrack) as Void {
         var skyCalc = new SkyCalculator(dc.getWidth(), dc.getHeight());
 
         dc.setColor(palette.index, COLOR_NONE);
 
         for (var h = 0; h < 24; h += 1) {
-            var t = midnight.add(new Duration(h*60*60));
-            var pos = Orbits.sunPosition(t, loc);  // Note: lots of time here. Cache them?
-            skyCalc.setPosition(pos.get(:azimuth), pos.get(:altitude));
+            skyCalc.setPosition(track.getAzimuth(h), track.getAltitude(h));
             if (skyCalc.onscreen()) {
                 if (h%6 == 0) {
                     // 6, 12, and 18
@@ -306,7 +323,6 @@ class moonfaceView extends WatchUi.WatchFace {
                     var r = h%3 == 0 ? 3 : 2;
                     dc.fillRectangle(skyCalc.x()-r, skyCalc.y()-r, r*2-1, r*2-1);
                 }
-
             }
         }
     }
@@ -443,6 +459,38 @@ class moonfaceView extends WatchUi.WatchFace {
             hours = ((hours + 11) % 12) + 1;
         }
         return hours.toString();
+    }
+}
+
+// Position of the sun relative to an observer's location at each hour of the day.
+// These values only need to be recomputed once per day, unless the location changes significantly.
+class SunTrack {
+    var loc as Location3;
+    var midnight as Moment;
+
+    var track as Array<Array<Float>>;
+
+    function initialize(loc as Location3, midnight as Moment) {
+        self.loc = loc;
+        self.midnight = midnight;
+
+        self.track = [] as Array<Array<Float>>;
+
+        for (var h = 0; h < 24; h += 1) {
+            var t = midnight.add(new Duration(h*60*60));
+            var pos = Orbits.sunPosition(t, loc);
+            track.add([pos.get(:azimuth), pos.get(:altitude)] as Array<Float>);
+        }
+    }
+
+    // Angle in radians from north, for hours between 0 and 23.
+    function getAzimuth(hour as Number) as Float {
+        return track[hour][0];
+    }
+
+    // Angle in radians above the horizon, for hours between 0 and 23.
+    function getAltitude(hour as Number) as Float {
+        return track[hour][1];
     }
 }
 
