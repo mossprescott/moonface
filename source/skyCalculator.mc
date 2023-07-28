@@ -119,7 +119,12 @@ function testSky(logger as Logger) as Boolean {
     assertEqualLog(calc.x(), 179, logger);
     assertEqualLog(calc.y(), 98, logger);
 
-    // TODO: what about values outside (-pi/2, pi/2)?
+    // Due northwest; well off-screen:
+    calc.setPosition(Math.PI*3/4, Math.PI/3);
+    assertEqualLog(calc.onscreen(), false, logger);
+    assertEqualLog(calc.x(), 278, logger);
+    assertEqualLog(calc.y(), 65, logger);
+    assertEqualLog(calc.pinnedX(), 243, logger);
 
     return true;
 }
