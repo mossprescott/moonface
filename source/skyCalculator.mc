@@ -56,13 +56,11 @@ class SkyCalculator {
     }
 
     public function x() as Number {
-        var scale = MAX_WIDTH*(width/2);
-        return width/2 + Math.round(scale*xFraction()).toNumber();
+        return Math.round((width/2) * (1 + MAX_WIDTH*xFraction())).toNumber();
     }
 
     public function y() as Number {
-        var scale = MAX_HEIGHT*(height/2);
-        return height/2 - Math.round(scale*yFraction()).toNumber();
+        return Math.round((height/2) * (1 - MAX_HEIGHT*yFraction())).toNumber();
     }
 
     // Unitless value between -2 (when the point is furthest to the left) and 2 (when the point
