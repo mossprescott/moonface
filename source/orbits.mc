@@ -9,11 +9,13 @@ import Toybox.Test;
 // Note: We need to use Doubles to represent time with precision, and those times often get
 // scaled to produce angles which become the inputs to the trig functions, so it's simpler to
 // just define all angles as either Double or Float.
-// Angles coming back from inverse functions are always small, so Float would be plenty,
-// but it's probably not worth worrying about at that point.
+// Angles coming back from inverse functions are always small, so Float is plenty, and
+// we force such values into the Float type (aliased as FRadians) just in case it saves some
+// time/space when they're used later.
 typedef Radians as Decimal;
 typedef Degrees as Decimal;
-
+typedef FRadians as Float;
+typedef DRadians as Double;
 
 // See https://github.com/mourner/suncalc/blob/master/suncalc.js
 //
@@ -48,12 +50,12 @@ class Orbits {
     // to the nearest the second; something like 46 bits is enough.
     typedef Julian as Double;
 
-    private static function toJulian(date /* as Moment */) as Julian {
+    private static function toJulian(date as Moment) as Julian {
         return date.value().toDouble()/daySecs - 0.5 + julian1970;
     }
 
     private static function fromJulian(julian as Julian) as Moment {
-        return new Moment(erase((julian + 0.5 - julian1970) * daySecs).toNumber());
+        return new Moment(((julian + 0.5 - julian1970) * daySecs).toNumber());
     }
 
     // Date-time as number of days since noon on the first day of the year 2000?
@@ -71,32 +73,32 @@ class Orbits {
     // Obliquity of the earth:
     private static var e as Radians = toRadians(23.4397);
 
-    private static function rightAscension(l as Radians, b as Radians) as Radians {
-        return atan2(sin(l)*cos(e) - tan(b)*sin(e), cos(l));
+    private static function rightAscension(l as Radians, b as Radians) as FRadians {
+        return atan2(sin(l)*cos(e) - tan(b)*sin(e), cos(l)).toFloat();
     }
-    private static function declination(l as Radians, b as Radians) as Radians {
-        return asin(sin(b)*cos(e) + cos(b)*sin(e)*sin(l));
+    private static function declination(l as Radians, b as Radians) as FRadians {
+        return asin(sin(b)*cos(e) + cos(b)*sin(e)*sin(l)).toFloat();
     }
 
-    private static function azimuth(h as Radians, phi as Radians, dec as Radians) as Radians {
-        return atan2(sin(h), cos(h)*sin(phi) - tan(dec)*cos(phi));
+    private static function azimuth(h as Radians, phi as Radians, dec as Radians) as FRadians {
+        return atan2(sin(h), cos(h)*sin(phi) - tan(dec)*cos(phi)).toFloat();
     }
-    private static function altitude(h as Radians, phi as Radians, dec as Radians) as Radians {
-        return asin(sin(phi)*sin(dec) + cos(phi)*cos(dec)*cos(h));
+    private static function altitude(h as Radians, phi as Radians, dec as Radians) as FRadians {
+        return asin(sin(phi)*sin(dec) + cos(phi)*cos(dec)*cos(h)).toFloat();
     }
 
     private static function siderealTime(d as Days, lw as Radians) as Radians {
         return toRadians(280.16 + 360.9856235 * d) - lw;
     }
 
-    private static function astroRefraction(h as Radians) as Radians {
+    private static function astroRefraction(h as Radians) as FRadians {
         // the following formula works for positive altitudes only.
         // if h = -0.08901179 a div/0 would occur.
         if (h < 0) { h = 0; }
 
         // formula 16.4 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
         // 1.02 / tan(h + 10.26 / (h + 5.10)) h in degrees, result in arc minutes -> converted to rad:
-        return 0.0002967 / tan(h + 0.00312536 / (h + 0.08901179));
+        return 0.0002967 / tan(h + 0.00312536 / (h + 0.08901179)).toFloat();
     }
 
 
@@ -117,8 +119,8 @@ class Orbits {
         return M + C + P + Math.PI;
     }
 
-    // { :dec, :ra }
-    private static function sunCoords(d as Days) as Dictionary<Symbol, Radians> {
+    private static function sunCoords(d as Days)
+            as { :dec as Float, :ra as Float } {
         var M = solarMeanAnomaly(d);
         var L = eclipticLongitude(M);
 
@@ -130,32 +132,28 @@ class Orbits {
 
 
     // Viewer-relative position of the sun at a moment in time.
-    // :azimuth => north = 0.
-    // :altitude => horizon = 0.
-    public static function sunPosition(time as Moment, loc /*as Location3*/) as Dictionary<Symbol, Radians> {
-        var lw  = -loc.longitude;
+    // :azim => south = 0.
+    // :alt => horizon = 0.
+    public static function sunPosition(time as Moment, loc as Location3)
+            as { :azim as Float, :alt as Float } {
+        var lw  = -loc.longitude as Float;
         var phi = loc.latitude;
         var d   = toDays(time);
 
-        var c  = erase(sunCoords(d));
-        var H  = siderealTime(d, lw) - c.get(:ra);
+        var c  = sunCoords(d);
+        var H  = siderealTime(d, lw) - (c[:ra] as Float);
 
         return {
-            :azimuth => azimuth(H, phi, c.get(:dec)),
-            :altitude => altitude(H, phi, c.get(:dec)),
+            :azim => azimuth(H, phi, c[:dec] as Float),
+            :alt => altitude(H, phi, c[:dec] as Float),
         };
     }
 
-    // HACK: defeat the type-checker, because it is sometimes confused when inferring the types of locals.
-    static function erase(x) {
-        return x;
-    }
-
-    private static var julian0 = 0.0009;
+    private static var julian0 as DRadians = (0.0009).toDouble();
 
     // TODO: units? Days/revolutions, but on what basis?
     private static function julianCycle(d as Days, lw as Radians) as Number {
-        return Math.round((d - julian0 - lw / (2 * Math.PI)));
+        return Math.round((d - julian0 - lw / (2 * Math.PI))).toNumber();
     }
 
     private static function approxTransit(Ht as Radians, lw as Radians, n as Number) as Days {
@@ -165,8 +163,8 @@ class Orbits {
         return julian2000 + ds + 0.0053*sin(M) - 0.0069*sin(2*L);
     }
 
-    private static function hourAngle(h as Radians, phi as Radians, d as Radians) as Radians {
-        return acos((sin(h) - sin(phi)*sin(d)) / (cos(phi)*cos(d)));
+    private static function hourAngle(h as Radians, phi as Radians, d as Radians) as FRadians {
+        return acos((sin(h) - sin(phi)*sin(d)) / (cos(phi)*cos(d))).toFloat();
     }
     private static function observerAngle(height as Float) as Degrees {
         return -2.076 * Math.sqrt(height) / 60;
@@ -187,10 +185,14 @@ class Orbits {
     //
     // Note: for our purposes, local time of day would be more useful, but this is at least
     // clearly defined and you can get there from here.
-    public static function sunTimes(date as Moment, loc /*as Location3*/) as Dictionary<Symbol, Moment> {
+    //
+    // TODO: produce null if the sun never rises (e.g. in the Arctic Circle in winter).
+    public static function sunTimes(date as Moment, loc as Location3)
+            as { :noon as Moment, :nadir as Moment, :rise as Moment, :set as Moment } {
         var lw  = -loc.longitude;
         var phi = loc.latitude;
-        var height = loc.altitude != null ? loc.altitude : 0.0;
+        var height = loc.altitude;
+        if (height == null) { height = 0.0; }
 
         var dh = observerAngle(height);
 
@@ -229,14 +231,15 @@ class Orbits {
 
     // :ra, :dec in Radians
     // :dist in km
-    private static function moonCoords(d as Days) as Dictionary<Symbol, Decimal> {
+    private static function moonCoords(d as Days)
+            as { :ra as Float, :dec as Float, :dist as Float } {
         var L = toRadians(218.316 + 13.176396 * d); // ecliptic longitude
         var M = toRadians(134.963 + 13.064993 * d); // mean anomaly
         var F = toRadians(93.272 + 13.229350 * d);  // mean distance
 
         var l  = L + toRadians(6.289) * sin(M); // longitude
         var b  = toRadians(5.128) * sin(F);     // latitude
-        var dt = 385001 - 20905 * cos(M);  // distance to the moon in km
+        var dt = (385001 - 20905 * cos(M)).toFloat();  // distance to the moon in km
 
         return {
             :ra => rightAscension(l, b),
@@ -246,24 +249,25 @@ class Orbits {
     }
 
     // Position of the moon in the sky, given the viewer's location.
-    // { :azimuth, :altitude, :distance (km), :parallacticAngle }
-    public static function moonPosition(date as Moment, loc /*as Location3*/) as Dictionary<Symbol, Decimal> {
+    // { :azim, :alt, :distance (km), :parallacticAngle }
+    public static function moonPosition(date as Moment, loc as Location3)
+            as { :azim as Float, :alt as Float, :dist as Float, :parallacticAngle as Float } {
         var lw  = -loc.longitude;
         var phi = loc.latitude;
         var d   = toDays(date);
 
-        var c = erase(moonCoords(d));
-        var H = siderealTime(d, lw) - c.get(:ra);
-        var h = altitude(H, phi, c.get(:dec));
+        var c = moonCoords(d);
+        var H = siderealTime(d, lw) - (c[:ra] as Float);
+        var h = altitude(H, phi, c[:dec] as Float);
         // formula 14.1 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
-        var pa = atan2(sin(H), tan(phi)*cos(c.get(:dec)) - sin(c.get(:dec))*cos(H));
+        var pa = atan2(sin(H), tan(phi)*cos(c[:dec] as Float) - sin(c[:dec] as Float)*cos(H)) as FRadians;
 
         var correctedH = h + astroRefraction(h); // altitude correction for refraction
 
         return {
-            :azimuth => azimuth(H, phi, c.get(:dec)),
-            :altitude => correctedH,
-            :distance => c.get(:dist),
+            :azim => azimuth(H, phi, c[:dec] as Float),
+            :alt => correctedH,
+            :dist => c[:dist] as Float,
             :parallacticAngle => pa,
         };
     }
@@ -273,22 +277,19 @@ class Orbits {
     // based on http://idlastro.gsfc.nasa.gov/ftp/pro/astro/mphase.pro formulas and
     // Chapter 48 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
     // Note: these parameters are independent of viewing location. We all see the same moon!
-    //
-    // :fraction
-    // :phase
-    // :angle
-    public static function moonIllumination(date as Moment) as Dictionary<Symbol, Decimal> {
+    public static function moonIllumination(date as Moment)
+            as { :fraction as Float, :phase as Float, :angle as Float } {
         var d = toDays(date);
-        var s = erase(sunCoords(d));
-        var m = erase(moonCoords(d));
+        var s = sunCoords(d);
+        var m = moonCoords(d);
 
         var sdist = 149598000.0; // distance from Earth to Sun in km
 
-        var sdec = s.get(:dec);
-        var sra = s.get(:ra);
-        var mdec = m.get(:dec);
-        var mra = m.get(:ra);
-        var mdist = m.get(:dist);
+        var sdec = s[:dec] as Float;
+        var sra = s[:ra] as Float;
+        var mdec = m[:dec] as Float;
+        var mra = m[:ra] as Float;
+        var mdist = m[:dist] as Float;
 
         var phi = acos(sin(sdec)*sin(mdec) + cos(sdec)*cos(mdec)*cos(sra - mra));
         var inc = atan2(sdist * sin(phi),
@@ -297,12 +298,25 @@ class Orbits {
                           sin(sdec)*cos(mdec) - cos(sdec)*sin(mdec)*cos(sra - mra));
 
         return {
-            :fraction => (1 + cos(inc)) / 2,
-            :phase => 0.5 + 0.5*inc*(angle < 0 ? -1 : 1)/Math.PI,
-            :angle => angle,
+            :fraction => floatOrFail((1 + cos(inc)) / 2),
+            :phase => floatOrFail(0.5 + 0.5*inc*(angle < 0 ? -1 : 1)/Math.PI),
+            :angle => floatOrFail(angle),
         };
     }
 
+    // Use this function when a value really definitely should always be a Float, or there's
+    // a programming error. Could be replaced by no-op for deployment.
+    private static function floatOrFail(x as Decimal) as Float {
+        switch (x) {
+            case instanceof Float:
+                return x as Float;
+            case instanceof Double:
+                System.error(Lang.format("Float value required; found double: $1$", [x]));
+            default:
+                // Presumably only null could slip in here, unless the type checker is truly confused.
+                System.error(Lang.format("Float value required; found: $1$", [x]));
+        }
+    }
 
     // public enum RiseAndSet {
     //     case alwaysUp
@@ -407,8 +421,8 @@ function testSunPosition(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
 
     var pos = Orbits.sunPosition(april17, Hamden);
-    assertApproximatelyEqual(pos.get(:azimuth), 0.5736, 0.01, logger);
-    assertApproximatelyEqual(pos.get(:altitude), 0.9617, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:azim) as Float, 0.5736, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:alt) as Float, 0.9617, 0.01, logger);
 
     // Note: the actual error is something like 0.5%, which seems OK if not great.
 
@@ -421,10 +435,10 @@ function testSunTimes(logger as Logger) as Boolean {
 
     var times = Orbits.sunTimes(midnight, Hamden);
 
-    assertEqualLog(formatTime(times.get(:noon)),  "2023-04-17 12:52", logger);
-    assertEqualLog(formatTime(times.get(:nadir)), "2023-04-17 00:52", logger);
-    assertEqualLog(formatTime(times.get(:rise)),  "2023-04-17 06:09", logger);
-    assertEqualLog(formatTime(times.get(:set)),   "2023-04-17 19:35", logger);
+    assertEqualLog(formatTime(times.get(:noon) as Moment),  "2023-04-17 12:52", logger);
+    assertEqualLog(formatTime(times.get(:nadir) as Moment), "2023-04-17 00:52", logger);
+    assertEqualLog(formatTime(times.get(:rise) as Moment),  "2023-04-17 06:09", logger);
+    assertEqualLog(formatTime(times.get(:set) as Moment),   "2023-04-17 19:35", logger);
 
     return true;
 }
@@ -438,10 +452,10 @@ function testSunTimes2(logger as Logger) as Boolean {
 
     var times = Orbits.sunTimes(midnight, guadalajara);
 
-    assertEqualLog(formatTime(times.get(:noon)),  "2023-08-15 14:59", logger);  // Actual: 14:57
-    assertEqualLog(formatTime(times.get(:nadir)), "2023-08-15 02:59", logger);
-    assertEqualLog(formatTime(times.get(:rise)),  "2023-08-15 08:33", logger);  // Actual: 08:32
-    assertEqualLog(formatTime(times.get(:set)),   "2023-08-15 21:24", logger);  // Actual: 21:22
+    assertEqualLog(formatTime(times.get(:noon) as Moment),  "2023-08-15 14:59", logger);  // Actual: 14:57
+    assertEqualLog(formatTime(times.get(:nadir) as Moment), "2023-08-15 02:59", logger);
+    assertEqualLog(formatTime(times.get(:rise) as Moment),  "2023-08-15 08:33", logger);  // Actual: 08:32
+    assertEqualLog(formatTime(times.get(:set) as Moment),   "2023-08-15 21:24", logger);  // Actual: 21:22
 
     return true;
 }
@@ -451,10 +465,10 @@ function testMoonPosition(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
 
     var pos = Orbits.moonPosition(april17, Hamden);
-    assertApproximatelyEqual(pos.get(:azimuth),          0.9277, 0.01, logger);
-    assertApproximatelyEqual(pos.get(:altitude),         0.5089, 0.01, logger);
-    assertApproximatelyEqual(pos.get(:distance),      369507.90,  1.0, logger);
-    assertApproximatelyEqual(pos.get(:parallacticAngle), 0.6464, 0.01, logger);
+    assertApproximatelyEqual(pos.get(:azim) as Float,             0.9277,    0.01, logger);
+    assertApproximatelyEqual(pos.get(:alt) as Float,              0.5089,    0.01, logger);
+    assertApproximatelyEqual(pos.get(:dist) as Float,             369507.90, 1.0,  logger);
+    assertApproximatelyEqual(pos.get(:parallacticAngle) as Float, 0.6464,    0.01, logger);
 
     return true;
 }
@@ -464,9 +478,9 @@ function testMoonIllumination(logger as Logger) as Boolean {
     var april17 = new Moment(1681754720);
 
     var pos = Orbits.moonIllumination(april17);
-    assertApproximatelyEqual(pos.get(:fraction), 0.06630, 0.0001, logger);
-    assertApproximatelyEqual(pos.get(:phase),    0.9171,  0.0001, logger);
-    assertApproximatelyEqual(pos.get(:angle),    1.057,   0.001, logger);
+    assertApproximatelyEqual(pos.get(:fraction) as Float, 0.06630, 0.0001, logger);
+    assertApproximatelyEqual(pos.get(:phase) as Float,    0.9171,  0.0001, logger);
+    assertApproximatelyEqual(pos.get(:angle) as Float,    1.057,   0.001,  logger);
 
     return true;
 }
@@ -479,7 +493,7 @@ function formatTime(time as Moment) as String {
         "$1$-$2$-$3$ $4$:$5$",
         [
             today.year,
-            today.month.format("%02d"),
+            (today.month as Number).format("%02d"),
             today.day.format("%02d"),
             today.hour.format("%02d"),
             today.min.format("%02d"),

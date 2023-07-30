@@ -35,6 +35,9 @@ def main():
         img.save(f"{dir}/{name}")
         print(f"""  <bitmap id="Moon{radius}_{i:02d}" filename="{name}" />""")
 
+    icon = munge(src, 0, 20)
+    icon.save(f"{dir}/launcher_icon40.png")
+
 
 def munge(img, angle, radius):
     """Rotate, resize, and dither (in that order)."""

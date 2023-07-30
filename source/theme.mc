@@ -20,15 +20,24 @@ module MFColors {
 
         // TODO: some value(s) to bias the contrast of the moon
 
-        function initialize(colors as Array<ColorType?>) {
-            sky = colors[0];
-            below = colors[1];
-            horizon = colors[2];
-            index = colors[3];
-            compass = colors[4];
-            time = colors[5];
-            sun = colors[6];
-            moonIndicator = colors[7];
+        function initialize(
+                sky as ColorType,
+                below as ColorType,
+                horizon as ColorType?,
+                index as ColorType,
+                compass as ColorType,
+                time as ColorType,
+                sun as ColorType,
+                moonIndicator as ColorType) {
+
+            self.sky = sky;
+            self.below = below;
+            self.horizon = horizon;
+            self.index = index;
+            self.compass = compass;
+            self.time = time;
+            self.sun = sun;
+            self.moonIndicator = moonIndicator;
         }
     }
 
@@ -49,7 +58,7 @@ module MFColors {
     }
 
     const Colorful as Theme = new Theme(
-        new Palette([
+        new Palette(
             /* sky     */ 0x0055AA,
             /* below   */ 0x550055,
             /* horizon */ null,
@@ -57,9 +66,9 @@ module MFColors {
             /* compass */ Graphics.COLOR_LT_GRAY,
             /* time    */ Graphics.COLOR_WHITE,
             /* sun     */ 0xFFFFAA,
-            /* moonInd */ Graphics.COLOR_LT_GRAY,
-            ] as Array<ColorType?>),
-        new Palette([
+            /* moonInd */ Graphics.COLOR_LT_GRAY
+        ),
+        new Palette(
             /* sky     */ Graphics.COLOR_BLACK,
             /* below   */ 0x550055,
             /* horizon */ null,
@@ -67,11 +76,10 @@ module MFColors {
             /* compass */ Graphics.COLOR_LT_GRAY,
             /* time    */ Graphics.COLOR_WHITE,
             /* sun     */ 0xFFFFAA,
-            /* moonInd */ Graphics.COLOR_LT_GRAY,
-            ] as Array<ColorType?>)
-        );
+            /* moonInd */ Graphics.COLOR_LT_GRAY
+        ));
 
-    const LightPalette as Palette = new Palette([
+    const LightPalette as Palette = new Palette(
         /* sky     */ Graphics.COLOR_WHITE,
         /* below   */ Graphics.COLOR_WHITE,
         /* horizon */ Graphics.COLOR_LT_GRAY,
@@ -79,10 +87,10 @@ module MFColors {
         /* compass */ Graphics.COLOR_DK_GRAY,
         /* time    */ Graphics.COLOR_BLACK,
         /* sun     */ 0xFFFF00,
-        /* moonInd */ Graphics.COLOR_DK_GRAY,
-    ] as Array<ColorType>);
+        /* moonInd */ Graphics.COLOR_DK_GRAY
+    );
 
-    const DarkPalette as Palette = new Palette([
+    const DarkPalette as Palette = new Palette(
         /* sky     */ Graphics.COLOR_BLACK,
         /* below   */ Graphics.COLOR_BLACK,
         /* horizon */ Graphics.COLOR_DK_GRAY,
@@ -90,8 +98,8 @@ module MFColors {
         /* compass */ Graphics.COLOR_LT_GRAY,
         /* time    */ Graphics.COLOR_WHITE,
         /* sun     */ 0xFFFFAA,
-        /* moonInd */ Graphics.COLOR_LT_GRAY,
-    ] as Array<ColorType>);
+        /* moonInd */ Graphics.COLOR_LT_GRAY
+    );
 
     // Black on white, all the time:
     const Light as Theme = new Theme(

@@ -5,7 +5,22 @@ import Toybox.Test;
 // Assert two values are equal, and include the values in the message on failure.
 (:debug)
 function assertEqualLog(value1 as Object?, value2 as Object?, logger as Logger) as Void {
-    Test.assertEqualMessage(value1, value2, Lang.format("Expected $1$ == $2$", [value1, value2]));
+    if (value1 == null) {
+        if (value2 == null) {
+            return;
+        }
+        else {
+            Test.assertMessage(false, Lang.format("Expected $1$ == $2$", [value1, value2]));
+        }
+    }
+    else {
+        if (value2 == null) {
+            Test.assertMessage(false, Lang.format("Expected $1$ == $2$", [value1, value2]));
+        }
+        else {
+            Test.assertEqualMessage(value1, value2, Lang.format("Expected $1$ == $2$", [value1, value2]));
+        }
+    }
 }
 
 // Assert two values floating point are approximately equal; within the given margin.
