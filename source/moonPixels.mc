@@ -132,6 +132,7 @@ class MoonPixels {
 
         clearShadow(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
         clearShadow2(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
+        clearShadow3(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
 
         //
         // Finally, copy the completed image to the destination:
@@ -441,6 +442,16 @@ class MoonPixels {
         }
     }
 
+    private function clearShadow3(dc as Dc, radius as Number,
+                        parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
+
+        var majorAxis = (radius + 0.5).toDouble();
+        var minorAxis = majorAxis*(2*illuminationFraction - 1).abs();
+
+        dc.setColor(Graphics.COLOR_PURPLE, -1);
+        var ellipse = new Ellipse(majorAxis, minorAxis, parallacticAngle, dc);
+    }
+
     private function getBuffer(radius as Number) as BufferedBitmap {
         var size = radius*2;
 
@@ -466,8 +477,168 @@ class MoonPixels {
 }
 
 
+// Note: this is a heck of a lot more readable, by factoring out all of the bumping/testing/recording
+// into small methods. Unfortunately, it's about 2x slower, according to the simulator's profiler.
+// That's plausible, because of all the method calls and member references. Keeping it all in one ugly
+// function means only fast local variable access, even though the code is larger and uglier.
+class Ellipse {
+    // Debug:
+    var dc as Dc?;
 
-// function
+    // Co-efficients that define the ellipse's shape:
+    //   points (x,y) where Ax^2 + 2Bxy + Cy^2 - D = 0
+    var A as Float;
+    var B as Float;
+    var C as Float;
+    var D as Float;
+
+    // State variables for tracing outside the edge of the ellipse:
+    var x as Number;
+    var y as Number;
+    var dx as Float;
+    var dy as Float;
+
+    //
+    function initialize(majorAxis as Double, minorAxis as Double, angle as Decimal, dc as Dc?) {
+        self.dc = dc;
+
+        var xa = -Math.sin(angle)*majorAxis;
+        var ya = Math.cos(angle)*majorAxis;
+
+        // Choose minor axis, avoiding very small values which could trigger edge cases:
+        if (minorAxis < 1.0) { minorAxis = 1.5d; }
+        var xb = Math.cos(angle)*minorAxis;
+        var yb = Math.sin(angle)*minorAxis;
+
+        // Choose coords such that ya and yb >= 0:
+        if (ya < 0) { xa = -xa; ya = -ya; }
+        if (yb < 0) { xb = -xb; yb = -yb; }
+        // ... and xa > 0:
+        if (xa < 0) {
+            var tmp;
+            tmp = xa; xa = xb; xb = tmp;
+            tmp = ya; ya = yb; yb = tmp;
+        }
+
+        // Tricky: x(y)a(b) can be small, but not all of them. Using Double for everything
+        // avoids any early rounding. At the end, convert everything to Float, which the
+        // VM handles more efficiently than Long. The paper uses 64-bit integers, because
+        // we don't need any precision past the decimal point, but it was written when
+        // floating-point wasn't cheap the way it probably is now.
+        var asq = xa*xa + ya*ya;
+        var asqs = asq*asq;
+        var bsq = xb*xb + yb*yb;
+        var bsqs = bsq*bsq;
+        A = (xa*xa*bsqs + xb*xb*asqs).toFloat();
+        B = (xa*ya*bsqs + xb*yb*asqs).toFloat();
+        C = (ya*ya*bsqs + yb*yb*asqs).toFloat();
+        D = (asqs*bsqs).toFloat();
+
+        // Initialize state variables:
+        x = -Math.ceil(xa).toNumber();
+        y = -Math.ceil(ya).toNumber();
+        dx = B*x + C*y;
+        dy = -(A*x + B*y);
+
+        //
+        // Now record 5 arcs for different regimes (plus one to get to a suitable starting point):
+        //
+
+        // First advance to a point where the magnitude of slope is >= 1, without
+        // recording any pixels:
+        if (x > y) {
+            // Arc 0: (-xa, -ya) left and maybe up until the slope is -1; x-- (y++)
+            while (-dy > dx) {
+                // Choose between (x-1, y) and (x-1, y+1).
+                // Test (x-1, y+1); if inside, then go to (x-1, y), otherwise (x-1, y+1)
+                if (!inside(x-1, y+1)) { bumpY(1); }
+                bumpX(-1);
+            }
+        }
+
+        // Arc 1: up and maybe left until the tangent is vertical; y++ (x--)
+        while (dx <= 0) {
+            record(x, y);
+
+            // Choose between (x, y+1) and (x-1, y+1).
+            // Test (x, y+1); if inside, then go to (x-1, y+1), otherwise (x, y+1)
+            if (inside(x, y+1)) { bumpX(-1); }
+            bumpY(1);
+        }
+
+        // Arc 2: up and maybe right until slope = 1; y++ (x++)
+        while (dy > dx) {
+            record(x, y);
+
+            // Choose between (x, y+1) and (x+1, y+1).
+            // Test (x+1, y+1); if inside, then go to (x, y+1), otherwise (x+1, y+1)
+            if (!inside(x+1, y+1)) { bumpX(1); }
+            bumpY(1);
+        }
+
+        // Arc 3: right and maybe up until tangent is horizontal; x++ (y++)
+        while (dy >= 0) {
+            record(x, y);
+
+            // Choose between (x+1, y) and (x+1, y+1).
+            // Test (x+1, y); if inside, then go to (x+1, y+1), otherwise (x+1, y)
+            if (inside(x+1, y)) { bumpY(1); }
+            bumpX(1);
+        }
+
+        // Arc 4: right and maybe down until the slope is -1; x++ (y--)
+        // dc.setColor(Graphics.COLOR_PINK, -1);
+        while (-dy < dx) {
+            record(x, y);
+
+            // Choose between (x+1, y) and (x+1, y-1).
+            // Test (x+1, y-1); if inside, then go to (x+1, y), otherwise (x+1, y-1)
+            if (!inside(x+1, y-1)) { bumpY(-1); }
+            bumpX(1);
+        }
+
+        // Arc 5: down and maybe right until (xa, ya); y-- (x++)
+        while (y > ya) {
+            record(x, y);
+
+            // Choose between (x, y-1) and (x+1, y-1).
+            // Test (x, y-1); if inside, then go to (x+1, y-1), otherwise (x, y-1)
+            if (inside(x, y-1)) { bumpX(1); }
+            bumpY(-1);
+        }
+    }
+
+    private function record(x as Number, y as Number) as Void {
+        var dc = self.dc;
+        if (dc != null) {
+            var radius = 35; // HACK
+            dc.drawPoint(radius + x, radius + y);
+            dc.drawPoint(radius - x, radius - y);
+        }
+
+        // TODO: record to array(s) of extreme values
+    }
+
+    // Test if a point is strictly inside the outline of the ellipse.
+    private function inside(x as Number, y as Number) as Boolean {
+        var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+        return sigma < 0;
+    }
+
+    // Add +/- 1 to x, and update dx/dy accordingly.
+    private function bumpX(d as Number) as Void {
+        dx += B*d;
+        dy -= A*d;
+        x += d;
+    }
+
+    // Add +/- 1 to y, and update dx/dy accordingly.
+    private function bumpY(d as Number) as Void {
+        dx += C*d;
+        dy -= B*d;
+        y += d;
+    }
+}
 
 // Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase
 // of the moon.
