@@ -131,6 +131,7 @@ class MoonPixels {
         drawFullMoon(bufferDc, radius, adjustedAngle);
 
         clearShadow(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
+        clearShadow2(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
 
         //
         // Finally, copy the completed image to the destination:
@@ -245,6 +246,179 @@ class MoonPixels {
         dc.clearClip();
     }
 
+    // Adapted from "Integer-based Algorithm for Drawing Ellipses" (Eberly, 1999).
+    private function clearShadow2(dc as Dc, radius as Number,
+                        parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
+        // var lefts = new Array<Number?>[2*radius];
+        // var rights = new Array<Number?>[2*radius];
+
+        // Note: the y-axis is reversed on the display from the terms used here, so "up" means
+        // increasing y, which is actually down on the screen.
+
+        // Note: this algorithm draws pixels that are definitely outside the ellipse. Probably want
+        // to account for that by erasing to the inside edge of the traced outline.
+
+        // xa, ya: axis in the first quadrant (xa > 0, ya >= 0), with xa >= ya
+        // xb, yb: axis in the second quadrant
+
+        var xa = Math.round(-Math.sin(parallacticAngle)*radius).toNumber();
+        var ya = Math.round(Math.cos(parallacticAngle)*radius).toNumber();
+
+        var bToA = (2*illuminationFraction - 1).abs();
+        var xb = Math.round(Math.cos(parallacticAngle)*radius*bToA).toNumber();
+        var yb = Math.round(Math.sin(parallacticAngle)*radius*bToA).toNumber();
+
+        // Choose coords such that ya and yb >= 0:
+        if (ya < 0) { xa = -xa; ya = -ya; }
+        if (yb < 0) { xb = -xb; yb = -yb; }
+        // ... and xa > 0:
+        if (xa < 0) {
+            var tmp;
+            tmp = xa; xa = xb; xb = tmp;
+            tmp = ya; ya = yb; yb = tmp;
+        }
+
+        dc.setColor(Graphics.COLOR_RED, -1);
+        dc.drawPoint(radius + xa, radius + ya);
+        // dc.drawPoint(radius - xa, radius - ya);
+        dc.setColor(Graphics.COLOR_BLUE, -1);
+        dc.drawPoint(radius + xb, radius + yb);
+        // dc.drawPoint(radius - xb, radius - yb);
+
+
+        // The ellipse is points (x,y) where Ax^2 + 2Bxy + Cy^2 - D = 0
+        // FIXME: use un-rounded xa,xb,ya,yb to compute coefficients? Otherwise it's weirdly
+        // stuck to whole pixel alignment and doesn't rotate smoothly.
+        var asqs = sq(sq(xa) + sq(ya));
+        var bsqs = sq(sq(xb) + sq(yb));
+        var A = sq(xa)*bsqs + sq(xb)*asqs;
+        var B = xa*ya*bsqs + xb*yb*asqs;
+        var C = sq(ya)*bsqs + sq(yb)*asqs;
+        var D = asqs*bsqs;
+        // System.println(Lang.format("$1$;$2$;$3$;$4$", [A, B, C, D]));
+
+        /*if (xa == 0) {
+            // Axis-aligned:
+            // This would be faster, but not necessary?
+        }
+        else*/ if (xa >= ya) {
+            // Non-aligned, case 1; magnitude of slope at (xa, ya) is >= 1:
+
+            var x = -xa;
+            var y = -ya;
+            var dx = -(B*xa + C*ya);
+            var dy = A*xa + B*ya;
+
+            // System.println(Lang.format("dx: $1$", [dx]));
+
+            // Arc 1: (-xa, -ya) up and maybe left until the tangent is vertical; y++ (x--)
+            dc.setColor(Graphics.COLOR_GREEN, -1);
+            while (dx <= 0) {
+                // System.println(Lang.format("x: $1$, y: $2$", [x, y]));
+
+                dc.drawPoint(radius + x, radius + y);
+                dc.drawPoint(radius - x, radius - y);
+
+                // Test (x, y+1); if inside, then go to (x-1, y+1), otherwise (x, y+1)
+                y += 1;
+                var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+                if (sigma < 0) {
+                    dx -= B;
+                    dy += A;
+                    x -= 1;
+                }
+                dx += C;
+                dy -= B;
+            }
+
+            // Arc 2: up and maybe right until slope = 1; y++ (x++)
+            // dc.setColor(Graphics.COLOR_PURPLE, -1);
+            while (dy > dx) {
+                dc.drawPoint(radius + x, radius + y);
+                dc.drawPoint(radius - x, radius - y);
+
+                // Choose between (x, y+1) and (x+1, y+1).
+                // Test (x+1, y+1); if inside, then go to (x, y+1), otherwise (x+1, y+1)
+                y += 1;
+                var sigma = A*(x+1)*(x+1) + 2*B*(x+1)*y + C*y*y - D;
+                if (sigma >= 0) {
+                    dx += B;
+                    dy -= A;
+                    x += 1;
+                }
+                dx += C;
+                dy -= B;
+            }
+
+            // Arc 3: right and maybe up until tangent is horizontal; x++ (y++)
+            // dc.setColor(Graphics.COLOR_ORANGE, -1);
+            while (dy >= 0) {
+                dc.drawPoint(radius + x, radius + y);
+                dc.drawPoint(radius - x, radius - y);
+
+                // Choose between (x+1, y) and (x+1, y+1).
+                // Test (x+1, y); if inside, then go to (x+1, y+1), otherwise (x+1, y)
+                x += 1;
+                var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+                if (sigma < 0) {
+                    dx += C;
+                    dy -= B;
+                    y += 1;
+                }
+                dx += B;
+                dy -= A;
+            }
+
+            // Arc 4: right and maybe down until the slope is -1; x++ (y--)
+            // dc.setColor(Graphics.COLOR_PINK, -1);
+            while (-dy < dx) {
+                dc.drawPoint(radius + x, radius + y);
+                dc.drawPoint(radius - x, radius - y);
+
+                // Choose between (x+1, y) and (x+1, y-1).
+                // Test (x+1, y-1); if inside, then go to (x+1, y), otherwise (x+1, y-1)
+                x += 1;
+                var sigma = A*x*x + 2*B*x*(y-1) + C*(y-1)*(y-1) - D;
+                if (sigma > 0) {
+                    dx -= C;
+                    dy += B;
+                    y -= 1;
+                }
+                dx += B;
+                dy -= A;
+            }
+
+            // Arc 5: down and maybe right until (xa, ya); y-- (x++)
+            // dc.setColor(Graphics.COLOR_YELLOW, -1);
+            while (y > ya) {
+                dc.drawPoint(radius + x, radius + y);
+                dc.drawPoint(radius - x, radius - y);
+
+                // Choose between (x, y-1) and (x+1, y-1).
+                // Test (x, y-1); if inside, then go to (x+1, y-1), otherwise (x, y-1)
+                y -= 1;
+                var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+                if (sigma < 0) {
+                    dx += B;
+                    dy -= A;
+                    x += 1;
+                }
+                dx -= C;
+                dy += B;
+            }
+
+        }
+        else {
+            // Non-aligned, case 2:
+        }
+    }
+
+    // Square and convert to 64-bit to avoid overflow. Probably hurts speed.
+    private static function sq(x as Integer) as Long {
+        var xl = x.toLong();
+        return xl*xl;
+    }
+
     private function getBuffer(radius as Number) as BufferedBitmap {
         var size = radius*2;
 
@@ -269,6 +443,9 @@ class MoonPixels {
     }
 }
 
+
+
+// function
 
 // Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase
 // of the moon.
