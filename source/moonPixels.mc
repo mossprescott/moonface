@@ -261,12 +261,15 @@ class MoonPixels {
         // xa, ya: axis in the first quadrant (xa > 0, ya >= 0), with xa >= ya
         // xb, yb: axis in the second quadrant
 
-        var xa = Math.round(-Math.sin(parallacticAngle)*radius).toNumber();
-        var ya = Math.round(Math.cos(parallacticAngle)*radius).toNumber();
+        var majorAxis = (radius + 0.5).toDouble();
+        var xa = -Math.sin(parallacticAngle)*majorAxis;
+        var ya = Math.cos(parallacticAngle)*majorAxis;
 
-        var bToA = (2*illuminationFraction - 1).abs();
-        var xb = Math.round(Math.cos(parallacticAngle)*radius*bToA).toNumber();
-        var yb = Math.round(Math.sin(parallacticAngle)*radius*bToA).toNumber();
+        // Choose minor axis, avoiding very small values which could trigger edge cases:
+        var minorAxis = majorAxis*(2*illuminationFraction - 1).abs();
+        if (minorAxis < 1.0) { minorAxis = 1.5d; }
+        var xb = Math.cos(parallacticAngle)*minorAxis;
+        var yb = Math.sin(parallacticAngle)*minorAxis;
 
         // Choose coords such that ya and yb >= 0:
         if (ya < 0) { xa = -xa; ya = -ya; }
@@ -278,47 +281,78 @@ class MoonPixels {
             tmp = ya; ya = yb; yb = tmp;
         }
 
-        dc.setColor(Graphics.COLOR_RED, -1);
-        dc.drawPoint(radius + xa, radius + ya);
-        // dc.drawPoint(radius - xa, radius - ya);
-        dc.setColor(Graphics.COLOR_BLUE, -1);
-        dc.drawPoint(radius + xb, radius + yb);
-        // dc.drawPoint(radius - xb, radius - yb);
+        // dc.setColor(Graphics.COLOR_RED, -1);
+        // dc.drawPoint(radius + xa, radius + ya);
+        // // dc.drawPoint(radius - xa, radius - ya);
+        // dc.setColor(Graphics.COLOR_BLUE, -1);
+        // dc.drawPoint(radius + xb, radius + yb);
+        // // dc.drawPoint(radius - xb, radius - yb);
 
 
         // The ellipse is points (x,y) where Ax^2 + 2Bxy + Cy^2 - D = 0
-        // FIXME: use un-rounded xa,xb,ya,yb to compute coefficients? Otherwise it's weirdly
-        // stuck to whole pixel alignment and doesn't rotate smoothly.
-        var asqs = sq(sq(xa) + sq(ya));
-        var bsqs = sq(sq(xb) + sq(yb));
-        var A = sq(xa)*bsqs + sq(xb)*asqs;
-        var B = xa*ya*bsqs + xb*yb*asqs;
-        var C = sq(ya)*bsqs + sq(yb)*asqs;
-        var D = asqs*bsqs;
-        // System.println(Lang.format("$1$;$2$;$3$;$4$", [A, B, C, D]));
+        // Tricky: x(y)a(b) can be small, but not all of them. Using Double for eveything
+        // avoids any early rounding. At the end, convert everything to Float, which the
+        // VM handles more efficiently than Long. The paper uses 64-bit integers, because
+        // we don't need any precision past the decimal point, but it was written when
+        // floating-point wasn't cheap the way it probably is now.
+        var asq = xa*xa + ya*ya;
+        var asqs = asq*asq;
+        var bsq = xb*xb + yb*yb;
+        var bsqs = bsq*bsq;
+        var A = (xa*xa*bsqs + xb*xb*asqs).toFloat();
+        var B = (xa*ya*bsqs + xb*yb*asqs).toFloat();
+        var C = (ya*ya*bsqs + yb*yb*asqs).toFloat();
+        var D = (asqs*bsqs).toFloat();
+        // System.println(Lang.format("($1$, $2$); ($3$, $4$)", [xa, ya, xb, yb]));
+        // System.println(Lang.format("$1$; $2$; $3$; $4$", [A/2.15e9, B/2.15e9, C/2.15e9, D/2.15e9]));
 
-        /*if (xa == 0) {
-            // Axis-aligned:
-            // This would be faster, but not necessary?
+        // TEMP:
+        dc.setColor(Graphics.COLOR_GREEN, -1);
+
+        if ((A == 0.0 and B == 0.0) or (C == 0.0 and D == 0.0)) {
+            System.println("Zero coefficients! Skip for now");
         }
-        else*/ if (xa >= ya) {
-            // Non-aligned, case 1; magnitude of slope at (xa, ya) is >= 1:
-
-            var x = -xa;
-            var y = -ya;
-            var dx = -(B*xa + C*ya);
-            var dy = A*xa + B*ya;
+        // else if (xa == 0) {
+        //     System.println("xa is 0. Skip for now");
+        //     // Axis-aligned:
+        //     // Necessary because zero coefficients create infinite loops?
+        // }
+        else {
+            var x = Math.round(-xa).toNumber();
+            var y = Math.round(-ya).toNumber();
+            var dx = B*x + C*y;
+            var dy = -(A*x + B*y);
 
             // System.println(Lang.format("dx: $1$", [dx]));
 
-            // Arc 1: (-xa, -ya) up and maybe left until the tangent is vertical; y++ (x--)
-            dc.setColor(Graphics.COLOR_GREEN, -1);
-            while (dx <= 0) {
-                // System.println(Lang.format("x: $1$, y: $2$", [x, y]));
+            // First advance to a point where the magnitude of slope is >= 1, without
+            // recording any pixels:
+            if (x > y) {
+                // Arc 0: (-xa, -ya) left and maybe up until the slope is -1; x-- (y++)
+                while (-dy > dx) {
+                    // dc.drawPoint(radius + x, radius + y);
+                    // dc.drawPoint(radius - x, radius - y);
 
+                    // Choose between (x-1, y) and (x-1, y+1).
+                    // Test (x-1, y+1); if inside, then go to (x-1, y), otherwise (x-1, y+1)
+                    x -= 1;
+                    var sigma = A*x*x + 2*B*x*(y+1) + C*(y+1)*(y+1) - D;
+                    if (sigma >= 0) {
+                        dx += C;
+                        dy -= B;
+                        y += 1;
+                    }
+                    dx -= B;
+                    dy += A;
+                }
+            }
+
+            // Arc 1: up and maybe left until the tangent is vertical; y++ (x--)
+            while (dx <= 0) {
                 dc.drawPoint(radius + x, radius + y);
                 dc.drawPoint(radius - x, radius - y);
 
+                // Choose between (x, y+1) and (x-1, y+1).
                 // Test (x, y+1); if inside, then go to (x-1, y+1), otherwise (x, y+1)
                 y += 1;
                 var sigma = A*x*x + 2*B*x*y + C*y*y - D;
@@ -332,7 +366,6 @@ class MoonPixels {
             }
 
             // Arc 2: up and maybe right until slope = 1; y++ (x++)
-            // dc.setColor(Graphics.COLOR_PURPLE, -1);
             while (dy > dx) {
                 dc.drawPoint(radius + x, radius + y);
                 dc.drawPoint(radius - x, radius - y);
@@ -389,7 +422,6 @@ class MoonPixels {
             }
 
             // Arc 5: down and maybe right until (xa, ya); y-- (x++)
-            // dc.setColor(Graphics.COLOR_YELLOW, -1);
             while (y > ya) {
                 dc.drawPoint(radius + x, radius + y);
                 dc.drawPoint(radius - x, radius - y);
@@ -406,17 +438,7 @@ class MoonPixels {
                 dx -= C;
                 dy += B;
             }
-
         }
-        else {
-            // Non-aligned, case 2:
-        }
-    }
-
-    // Square and convert to 64-bit to avoid overflow. Probably hurts speed.
-    private static function sq(x as Integer) as Long {
-        var xl = x.toLong();
-        return xl*xl;
     }
 
     private function getBuffer(radius as Number) as BufferedBitmap {
