@@ -197,9 +197,11 @@ class moonfaceView extends WatchUi.WatchFace {
 
         var MOON_DEBUG = true;
         if (MOON_DEBUG) {
-            var angle = 2*Math.PI*frameCount/100;
-            var fraction = (Math.cos(2*Math.PI*frameCount/400.0) + 1)/2;
-            var phase = (frameCount % 400) / 400.0;
+            var framesPerRotation = 100;
+            var framesPerCycle = 421;  // roughly a multiple but not quite to hit more combinations
+            var angle = 2*Math.PI*frameCount/framesPerRotation;
+            var fraction = (Math.cos(2*Math.PI*frameCount/framesPerCycle) + 1)/2;
+            var phase = (frameCount % framesPerCycle) / framesPerCycle.toFloat();
             moonPixels.draw(dc, dc.getWidth()/2, dc.getHeight()/3, moonPixels.getNativeRadius(),
                     angle, fraction, phase);
         }
