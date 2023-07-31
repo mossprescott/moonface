@@ -132,7 +132,6 @@ class MoonPixels {
 
         clearShadow(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
         clearShadow2(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
-        clearShadow3(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
 
         //
         // Finally, copy the completed image to the destination:
@@ -247,11 +246,17 @@ class MoonPixels {
         dc.clearClip();
     }
 
+    // Use a clever ellipse-tracing algorithm to find the pixels in each row that are on the border
+    // of the ellipse which defines the edge of the shadow. Then
     // Adapted from "Integer-based Algorithm for Drawing Ellipses" (Eberly, 1999).
+    //
+    // Note: it would be a lot more readable to factor out all of the bumping/testing/recording into
+    // small methods somewhere. Unfortunately, that's about 2x slower, according to the simulator's
+    // profiler. That's plausible, because of all the method calls and member references. Keeping it
+    // all in one ugly function means only fast local variable access, even though the code is larger
+    // and uglier.
     private function clearShadow2(dc as Dc, radius as Number,
                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
-        // var lefts = new Array<Number?>[2*radius];
-        // var rights = new Array<Number?>[2*radius];
 
         // Note: the y-axis is reversed on the display from the terms used here, so "up" means
         // increasing y, which is actually down on the screen.
@@ -307,8 +312,12 @@ class MoonPixels {
         // System.println(Lang.format("($1$, $2$); ($3$, $4$)", [xa, ya, xb, yb]));
         // System.println(Lang.format("$1$; $2$; $3$; $4$", [A/2.15e9, B/2.15e9, C/2.15e9, D/2.15e9]));
 
-        // TEMP:
-        dc.setColor(Graphics.COLOR_GREEN, -1);
+        // We'll accumulate every x-coord we trace for each non-negative y coord, then reduce them
+        // afterward. This isn't the most efficient way to store them, but it makes the repeated code
+        // simple, and we know the total number of such coords is O(radius).
+        var maxRow = radius+2;  // Not sure why we need this much margin, but otherwise we get overflow.
+        var xsByRow = new Array<Array<Number>>[maxRow+1];
+        for (var i = 0; i <= maxRow; i += 1) { xsByRow[i] = []; }
 
         if ((A == 0.0 and B == 0.0) or (C == 0.0 and D == 0.0)) {
             System.println("Zero coefficients! Skip for now");
@@ -331,9 +340,6 @@ class MoonPixels {
             if (x > y) {
                 // Arc 0: (-xa, -ya) left and maybe up until the slope is -1; x-- (y++)
                 while (-dy > dx) {
-                    // dc.drawPoint(radius + x, radius + y);
-                    // dc.drawPoint(radius - x, radius - y);
-
                     // Choose between (x-1, y) and (x-1, y+1).
                     // Test (x-1, y+1); if inside, then go to (x-1, y), otherwise (x-1, y+1)
                     x -= 1;
@@ -350,8 +356,8 @@ class MoonPixels {
 
             // Arc 1: up and maybe left until the tangent is vertical; y++ (x--)
             while (dx <= 0) {
-                dc.drawPoint(radius + x, radius + y);
-                dc.drawPoint(radius - x, radius - y);
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
 
                 // Choose between (x, y+1) and (x-1, y+1).
                 // Test (x, y+1); if inside, then go to (x-1, y+1), otherwise (x, y+1)
@@ -368,8 +374,8 @@ class MoonPixels {
 
             // Arc 2: up and maybe right until slope = 1; y++ (x++)
             while (dy > dx) {
-                dc.drawPoint(radius + x, radius + y);
-                dc.drawPoint(radius - x, radius - y);
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
 
                 // Choose between (x, y+1) and (x+1, y+1).
                 // Test (x+1, y+1); if inside, then go to (x, y+1), otherwise (x+1, y+1)
@@ -385,10 +391,9 @@ class MoonPixels {
             }
 
             // Arc 3: right and maybe up until tangent is horizontal; x++ (y++)
-            // dc.setColor(Graphics.COLOR_ORANGE, -1);
             while (dy >= 0) {
-                dc.drawPoint(radius + x, radius + y);
-                dc.drawPoint(radius - x, radius - y);
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
 
                 // Choose between (x+1, y) and (x+1, y+1).
                 // Test (x+1, y); if inside, then go to (x+1, y+1), otherwise (x+1, y)
@@ -404,10 +409,9 @@ class MoonPixels {
             }
 
             // Arc 4: right and maybe down until the slope is -1; x++ (y--)
-            // dc.setColor(Graphics.COLOR_PINK, -1);
             while (-dy < dx) {
-                dc.drawPoint(radius + x, radius + y);
-                dc.drawPoint(radius - x, radius - y);
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
 
                 // Choose between (x+1, y) and (x+1, y-1).
                 // Test (x+1, y-1); if inside, then go to (x+1, y), otherwise (x+1, y-1)
@@ -424,8 +428,8 @@ class MoonPixels {
 
             // Arc 5: down and maybe right until (xa, ya); y-- (x++)
             while (y > ya) {
-                dc.drawPoint(radius + x, radius + y);
-                dc.drawPoint(radius - x, radius - y);
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
 
                 // Choose between (x, y-1) and (x+1, y-1).
                 // Test (x, y-1); if inside, then go to (x+1, y-1), otherwise (x, y-1)
@@ -440,16 +444,37 @@ class MoonPixels {
                 dy += B;
             }
         }
-    }
 
-    private function clearShadow3(dc as Dc, radius as Number,
-                        parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
+        // FIXME: note re-definition of x and y
+        for (var y = 0; y <= radius; y += 1) {
+            var xs = xsByRow[y];
+            var count = xs.size();
+            if (count == 0) {
+                // no pixels in this row...
+            }
+            else {
+                var minX = xs[0];
+                var maxX = xs[0];
+                for (var i = 1; i < count; i += 1) {
+                    var x = xs[i] as Number;
+                    if (x < minX) { minX = x; }
+                    if (x > maxX) { maxX = x; }
+                }
+                dc.setColor(Graphics.COLOR_RED, -1);
+                dc.drawPoint(radius + minX, radius + y);
+                dc.drawPoint(radius - maxX, radius - y);
+                dc.setColor(Graphics.COLOR_GREEN, -1);
+                dc.drawPoint(radius + maxX, radius + y);
+                dc.drawPoint(radius - minX, radius - y);
+                dc.setStroke(0x330000FF);
+                dc.drawLine(radius + minX + 1, radius + y, radius + maxX, radius + y);
+                if (y > 0) {
+                    dc.drawLine(radius - maxX + 1, radius - y, radius - minX, radius - y);
+                }
 
-        var majorAxis = (radius + 0.5).toDouble();
-        var minorAxis = majorAxis*(2*illuminationFraction - 1).abs();
-
-        dc.setColor(Graphics.COLOR_PURPLE, -1);
-        var ellipse = new Ellipse(majorAxis, minorAxis, parallacticAngle, dc);
+                // TODO: decide which side of minX and maxX needs to be erased in each row and do it
+            }
+        }
     }
 
     private function getBuffer(radius as Number) as BufferedBitmap {
@@ -476,169 +501,6 @@ class MoonPixels {
     }
 }
 
-
-// Note: this is a heck of a lot more readable, by factoring out all of the bumping/testing/recording
-// into small methods. Unfortunately, it's about 2x slower, according to the simulator's profiler.
-// That's plausible, because of all the method calls and member references. Keeping it all in one ugly
-// function means only fast local variable access, even though the code is larger and uglier.
-class Ellipse {
-    // Debug:
-    var dc as Dc?;
-
-    // Co-efficients that define the ellipse's shape:
-    //   points (x,y) where Ax^2 + 2Bxy + Cy^2 - D = 0
-    var A as Float;
-    var B as Float;
-    var C as Float;
-    var D as Float;
-
-    // State variables for tracing outside the edge of the ellipse:
-    var x as Number;
-    var y as Number;
-    var dx as Float;
-    var dy as Float;
-
-    //
-    function initialize(majorAxis as Double, minorAxis as Double, angle as Decimal, dc as Dc?) {
-        self.dc = dc;
-
-        var xa = -Math.sin(angle)*majorAxis;
-        var ya = Math.cos(angle)*majorAxis;
-
-        // Choose minor axis, avoiding very small values which could trigger edge cases:
-        if (minorAxis < 1.0) { minorAxis = 1.5d; }
-        var xb = Math.cos(angle)*minorAxis;
-        var yb = Math.sin(angle)*minorAxis;
-
-        // Choose coords such that ya and yb >= 0:
-        if (ya < 0) { xa = -xa; ya = -ya; }
-        if (yb < 0) { xb = -xb; yb = -yb; }
-        // ... and xa > 0:
-        if (xa < 0) {
-            var tmp;
-            tmp = xa; xa = xb; xb = tmp;
-            tmp = ya; ya = yb; yb = tmp;
-        }
-
-        // Tricky: x(y)a(b) can be small, but not all of them. Using Double for everything
-        // avoids any early rounding. At the end, convert everything to Float, which the
-        // VM handles more efficiently than Long. The paper uses 64-bit integers, because
-        // we don't need any precision past the decimal point, but it was written when
-        // floating-point wasn't cheap the way it probably is now.
-        var asq = xa*xa + ya*ya;
-        var asqs = asq*asq;
-        var bsq = xb*xb + yb*yb;
-        var bsqs = bsq*bsq;
-        A = (xa*xa*bsqs + xb*xb*asqs).toFloat();
-        B = (xa*ya*bsqs + xb*yb*asqs).toFloat();
-        C = (ya*ya*bsqs + yb*yb*asqs).toFloat();
-        D = (asqs*bsqs).toFloat();
-
-        // Initialize state variables:
-        x = -Math.ceil(xa).toNumber();
-        y = -Math.ceil(ya).toNumber();
-        dx = B*x + C*y;
-        dy = -(A*x + B*y);
-
-        //
-        // Now record 5 arcs for different regimes (plus one to get to a suitable starting point):
-        //
-
-        // First advance to a point where the magnitude of slope is >= 1, without
-        // recording any pixels:
-        if (x > y) {
-            // Arc 0: (-xa, -ya) left and maybe up until the slope is -1; x-- (y++)
-            while (-dy > dx) {
-                // Choose between (x-1, y) and (x-1, y+1).
-                // Test (x-1, y+1); if inside, then go to (x-1, y), otherwise (x-1, y+1)
-                if (!inside(x-1, y+1)) { bumpY(1); }
-                bumpX(-1);
-            }
-        }
-
-        // Arc 1: up and maybe left until the tangent is vertical; y++ (x--)
-        while (dx <= 0) {
-            record(x, y);
-
-            // Choose between (x, y+1) and (x-1, y+1).
-            // Test (x, y+1); if inside, then go to (x-1, y+1), otherwise (x, y+1)
-            if (inside(x, y+1)) { bumpX(-1); }
-            bumpY(1);
-        }
-
-        // Arc 2: up and maybe right until slope = 1; y++ (x++)
-        while (dy > dx) {
-            record(x, y);
-
-            // Choose between (x, y+1) and (x+1, y+1).
-            // Test (x+1, y+1); if inside, then go to (x, y+1), otherwise (x+1, y+1)
-            if (!inside(x+1, y+1)) { bumpX(1); }
-            bumpY(1);
-        }
-
-        // Arc 3: right and maybe up until tangent is horizontal; x++ (y++)
-        while (dy >= 0) {
-            record(x, y);
-
-            // Choose between (x+1, y) and (x+1, y+1).
-            // Test (x+1, y); if inside, then go to (x+1, y+1), otherwise (x+1, y)
-            if (inside(x+1, y)) { bumpY(1); }
-            bumpX(1);
-        }
-
-        // Arc 4: right and maybe down until the slope is -1; x++ (y--)
-        // dc.setColor(Graphics.COLOR_PINK, -1);
-        while (-dy < dx) {
-            record(x, y);
-
-            // Choose between (x+1, y) and (x+1, y-1).
-            // Test (x+1, y-1); if inside, then go to (x+1, y), otherwise (x+1, y-1)
-            if (!inside(x+1, y-1)) { bumpY(-1); }
-            bumpX(1);
-        }
-
-        // Arc 5: down and maybe right until (xa, ya); y-- (x++)
-        while (y > ya) {
-            record(x, y);
-
-            // Choose between (x, y-1) and (x+1, y-1).
-            // Test (x, y-1); if inside, then go to (x+1, y-1), otherwise (x, y-1)
-            if (inside(x, y-1)) { bumpX(1); }
-            bumpY(-1);
-        }
-    }
-
-    private function record(x as Number, y as Number) as Void {
-        var dc = self.dc;
-        if (dc != null) {
-            var radius = 35; // HACK
-            dc.drawPoint(radius + x, radius + y);
-            dc.drawPoint(radius - x, radius - y);
-        }
-
-        // TODO: record to array(s) of extreme values
-    }
-
-    // Test if a point is strictly inside the outline of the ellipse.
-    private function inside(x as Number, y as Number) as Boolean {
-        var sigma = A*x*x + 2*B*x*y + C*y*y - D;
-        return sigma < 0;
-    }
-
-    // Add +/- 1 to x, and update dx/dy accordingly.
-    private function bumpX(d as Number) as Void {
-        dx += B*d;
-        dy -= A*d;
-        x += d;
-    }
-
-    // Add +/- 1 to y, and update dx/dy accordingly.
-    private function bumpY(d as Number) as Void {
-        dx += C*d;
-        dy -= B*d;
-        y += d;
-    }
-}
 
 // Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase
 // of the moon.
