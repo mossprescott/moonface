@@ -412,7 +412,7 @@ class MoonPixels {
                 // Test (x+1, y-1); if inside, then go to (x+1, y), otherwise (x+1, y-1)
                 x += 1;
                 var sigma = A*x*x + 2*B*x*(y-1) + C*(y-1)*(y-1) - D;
-                if (sigma > 0) {
+                if (sigma >= 0) {
                     dx -= C;
                     dy += B;
                     y -= 1;
