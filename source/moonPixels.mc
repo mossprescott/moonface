@@ -130,8 +130,7 @@ class MoonPixels {
 
         drawFullMoon(bufferDc, radius, adjustedAngle);
 
-        // clearShadow(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
-        clearShadow2(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
+        clearShadow(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
 
         //
         // Finally, copy the completed image to the destination:
@@ -182,72 +181,10 @@ class MoonPixels {
         }
     }
 
-    // Erase portions of the moon's image that are currently in shadow.
-    //
-    // In each row, test to see which portion of the pixels is visible, and use binary search
-    // to find the edge in image space. For skinny crescents, that reduces the number of
-    // ellipse calculations from a max of O(2*radius) ~= 60 to about O(log(2*radius)) ~= 8
-    // (plus an inevitable few per row).
-    private function clearShadow(dc as Dc, radius as Number,
-                        parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
-        // Note: Dc.clear seems to be the only way to write transparent pixels over the top of
-        // previous drawing. Although it seems like it might be expensive, it probably doesn't
-        // compare to the actual geometry we're doing.
-
-        var calc = new MoonFaceCalculator(radius, parallacticAngle, illuminationFraction, phase);
-
-        for (var y = -radius; y < radius; y += 1) {
-            calc.setRow(y);
-
-            if (!calc.illuminated(calc.minX)) {
-                // Some pixels on the left are dark:
-
-                // Note: clear all the way to the left edge, just in case there are any stray
-                // pixels in the source image (because there are).
-                var firstDarkX = -radius;
-
-                // Similarly, if the entire row is dark, and make sure to clear all the way to the
-                // right edge.
-                var lastDarkX = calc.lastNonIlluminated(calc.minX, calc.maxX);
-                if (lastDarkX == calc.maxX) {
-                    lastDarkX = radius;
-                }
-
-                dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
-                dc.clear();
-            }
-            else if (!calc.illuminated(calc.maxX)) {
-                // Some pixels on the right are dark:
-                // Note: in this case, we know that minX is not dark.
-
-                var firstDarkX = calc.lastIlluminated(calc.minX, calc.maxX) + 1;
-
-                // Note: clear all the way to the right edge, just in case there are any stray
-                // pixels in the source image (because there are).
-                var lastDarkX = radius;
-
-                dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
-                dc.clear();
-            }
-            else if (!calc.illuminated(0)) {
-                // Some pixels in the middle are dark (i.e. a rotated crescent):
-                // Note: we know minX and maxX are not dark
-
-                // FIXME: currently adding an extra pixel on either side to reduce jaggies, but
-                // this is probably too much, meaning there's never any true new moon.
-                var firstDarkX = calc.lastIlluminated(calc.minX, 0) + 2;
-                var lastDarkX = calc.lastNonIlluminated(0, calc.maxX) - 1;
-
-                dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
-                dc.clear();
-            }
-        }
-
-        dc.clearClip();
-    }
-
     // Use a clever ellipse-tracing algorithm to find the pixels in each row that are on the border
-    // of the ellipse which defines the edge of the shadow. Then
+    // of the ellipse which defines the edge of the shadow. Then some quick checks to determine
+    // which part of each row — with respect to the ellipse boundary — needs to be erased.
+    //
     // Adapted from "Integer-based Algorithm for Drawing Ellipses" (Eberly, 1999).
     //
     // Note: it would be a lot more readable to factor out all of the bumping/testing/recording into
@@ -255,7 +192,7 @@ class MoonPixels {
     // profiler. That's plausible, because of all the method calls and member references. Keeping it
     // all in one ugly function means only fast local variable access, even though the code is larger
     // and uglier.
-    private function clearShadow2(dc as Dc, radius as Number,
+    private function clearShadow(dc as Dc, radius as Number,
                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
 
         // Note: the y-axis is reversed on the display from the terms used here, so "up" means
@@ -589,178 +526,6 @@ class MoonPixels {
             System.error("no buffer");
         }
     }
-}
-
-
-// Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase
-// of the moon.
-//
-// Note: there's overhead in the VM to access object fields, as well as to call the methods,
-// but hopefully this will allow for an improved algorithm (i.e. binary search).
-class MoonFaceCalculator {
-    // var radius as Number;
-    // var parallacticAngle as Decimal;
-    // var illuminationFraction as Decimal;
-    // var phase as Decimal;
-
-    private var t11 as Float;
-    private var t21 as Float;
-    private var rsq as Float;
-
-    private var drawRight as Boolean;
-    private var drawCenter as Boolean;
-    private var drawLeft as Boolean;
-
-    private var asq as Float;
-    private var bsq as Float;
-    private var absq as Float;
-
-    private var y as Number;
-    // private var x as Number;
-
-    //
-    // Visible to the caller:
-    //
-
-    // Coords of the current point, in image space:
-    public var mx as Float;
-    public var my as Float;
-
-    // Minumum and maximum x-coords for the row, based on the circular disk only (not the current phase):
-    public var minX as Number;
-    public var maxX as Number;
-
-    function initialize(radius as Number, parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) {
-        // A bogus factor relative to which some pixel-level adjustments are made. Used to be the
-        // size of the array of raw samples, not that that actually meant anything here.
-        var SIZE = 128;
-
-        var scale = (SIZE/2)/radius.toFloat();
-        t11 = (Math.cos(-parallacticAngle)*scale).toFloat();
-        t21 = (Math.sin(-parallacticAngle)*scale).toFloat();
-        rsq = (radius*radius).toFloat();
-
-        // Half the minor axis of an ellipse defining the edge of the illuminated part of the moon.
-        // Note: I suspect an ellipse isn't actually quite the correct shape, but at this resolution
-        // it's probably close enough.
-        var a;
-        if (illuminationFraction < 0.5) {
-            // Just trying the get this approximately realistic:
-            // - some sliver of the moon visible except within ~24 hours of the new moon.
-            a = (SIZE/2 - 4)*(1 - 2*illuminationFraction);
-            // System.println(Lang.format("a: $1$", [a]));
-        } else {
-            a = (SIZE/2 - 4)*(2*illuminationFraction - 1);
-            // System.println(Lang.format("(-)a: $1$", [a]));
-        }
-        drawRight = phase <= 0.5;
-        drawCenter = 0.25 < phase and phase < 0.75;  // ?
-        drawLeft = phase >= 0.5;
-        // System.println(Lang.format("$1$; $2$; $3$", [drawLeft, drawCenter, drawRight]));
-
-        var b = SIZE/2;
-        asq = (a*a).toFloat();
-        bsq = (b*b).toFloat();
-        absq = asq*bsq;
-
-        y = 0;
-        mx = 0.0;
-        my = 0.0;
-        minX = 0;
-        maxX = 0;
-    }
-
-    function setRow(y as Number) as Void {
-        self.y = y;
-
-        // Note: effectively, truncating the real value to an int seems to force it to lie
-        // within the disk.
-        maxX = Math.sqrt(rsq - y*y).toNumber();
-        minX = -maxX;
-    }
-
-    // True if the pixel at (x, y) needs to be drawn. After this call, (mx, my) contains
-    // image-space coords.
-    function illuminated(x as Number) as Boolean {
-        // This check is redundant if minX and maxX are used.
-        // if (y*y + x*x > rsq) {
-        //     // Skip some calculation; the point is clearly outside the disk
-        //     return false;
-        // }
-
-        // Note: could save some multiplication by computing dx and dy once at
-        // start of each row. But that's probably not where the time is at the moment.
-        mx = x*t11 - y*t21;
-        my = x*t21 + y*t11;
-
-        // Is this pixel towards the center of the moon's image, relative to the ellipse
-        // that defines the edge of the illuminated area?
-        var inside = bsq*mx*mx + asq*my*my < absq;
-        if (inside) {
-            if (!drawCenter) {
-                return false;
-            }
-        }
-        else {
-            if (mx < 0 and !drawLeft) {
-                return false;
-            }
-            else if (mx > 0 and !drawRight) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    // Binary search to find the greatest x between lo and hi, inclusive, such that
-    // calc.illuminated(x) is false.
-    // Assumptions: the pixels between lo and hi form a single (possibly empty) non-illuminated
-    // region on the left, followed by a single (possibly empty) illuminated region on the right.
-    // If there are any extraneous pixels, the result could be just a random non-illuminated
-    // pixel.
-    function lastNonIlluminated(lo as Number, hi as Number) as Number {
-        // invariant: !calc.illuminated(lo) (assumed, at the start)
-
-        // Short-circuit this relatively common case, to produce the right result
-        // and keep the calculation of mid simple within the loop.
-        if (!illuminated(hi)) {
-            return hi;
-        }
-
-        while (hi > lo+1) {
-            var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
-            if (!illuminated(mid)) {
-                lo = mid;
-            }
-            else {
-                hi = mid;
-            }
-        }
-        return lo;
-    }
-
-    // Binary search to find the least x between lo and hi, inclusive, such that
-    // calc.illuminated(x) is false.
-    // Assumptions: the pixels between lo and hi form a single (possibly empty) illuminated region
-    // on the left, followed by a single (possibly empty) non-illuminated region on the right.
-    // If there are any extraneous pixels, the result could be just a random *illuminated*
-    // pixel.
-    function lastIlluminated(lo as Number, hi as Number) as Number {
-        // invariant: calc.illuminated(lo) (assumed, at the start)
-
-        while (hi > lo+1) {
-            var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
-            if (illuminated(mid)) {
-                lo = mid;
-            }
-            else {
-                hi = mid;
-            }
-        }
-        return hi;
-    }
-
 }
 
 (:test)
