@@ -479,7 +479,11 @@ class MoonPixels {
                     if (x < minX) { minX = x; }
                     if (x > maxX) { maxX = x; }
                 }
+
                 if (false) {
+                    // For debug purposes, render the ellipse boundaries in each row.
+                    // Note: the boundary pixels are considered to be outside of "center",
+                    // so they get erased along with the left/right region.
                     dc.clearClip();
                     dc.setColor(leftIsRight ? Graphics.COLOR_GREEN : Graphics.COLOR_RED, -1);
                     dc.drawPoint(radius + minX, radius + y);
@@ -487,11 +491,6 @@ class MoonPixels {
                     dc.setColor(leftIsRight ? Graphics.COLOR_RED : Graphics.COLOR_GREEN, -1);
                     dc.drawPoint(radius + maxX, radius + y);
                     dc.drawPoint(radius - minX, radius - y);
-                // dc.setStroke(0x330000FF);
-                // dc.drawLine(radius + minX + 1, radius + y, radius + maxX, radius + y);
-                // if (y > 0) {
-                //     dc.drawLine(radius - maxX + 1, radius - y, radius - minX, radius - y);
-                // }
                 }
 
                 // First, the row with -y:
