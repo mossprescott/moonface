@@ -447,11 +447,14 @@ class MoonPixels {
         // System.println(Lang.format("angle: $1$; sin: $2$; cos: $3$", [parallacticAngle, Math.sin(parallacticAngle), Math.cos(parallacticAngle)]));
         var leftIsRight = Math.cos(parallacticAngle) < 0;
 
-        // ya/yb, the one on the major axis:
+        // Reflect regions based on current rotation:
+        var eraseScreenLeft = leftIsRight ? eraseRight : eraseLeft;
+        var eraseScreenRight = leftIsRight ? eraseLeft : eraseRight;
+        var eraseScreenUp = upIsLeft ? eraseLeft : eraseRight;
+        var eraseScreenDown = upIsLeft ? eraseRight : eraseLeft;
+
+        // Positive y-coord of the point on the major axis (aka ya, before selecting for quadrants):
         var y1 = (Math.cos(parallacticAngle)*majorAxis).abs().toNumber();
-        // or do I need the y coord of the point where the tangent is vertical?
-        // var y2 = (Math.sqrt(D/A)*(B/C)).abs().toNumber();
-        // System.println(Lang.format("y1: $1$; y2: $2$", [y1, y2]));
 
         // FIXME: note re-definition of x and y
         for (var y = 0; y <= radius; y += 1) {
@@ -476,7 +479,7 @@ class MoonPixels {
                     if (x < minX) { minX = x; }
                     if (x > maxX) { maxX = x; }
                 }
-                if (true) {
+                if (false) {
                     dc.clearClip();
                     dc.setColor(leftIsRight ? Graphics.COLOR_GREEN : Graphics.COLOR_RED, -1);
                     dc.drawPoint(radius + minX, radius + y);
@@ -491,57 +494,53 @@ class MoonPixels {
                 // }
                 }
 
-                // Note: top and bottom probably reversed here (top = positive y)
-                var eraseScreenLeft = leftIsRight ? eraseRight : eraseLeft;
-                var eraseScreenRight = leftIsRight ? eraseLeft : eraseRight;
-                var eraseScreenBottom = upIsLeft ? eraseLeft : eraseRight;
-                var eraseScreenTop = upIsLeft ? eraseRight : eraseLeft;
-                var erase0;
-                if (y >= y1) {
-                    erase0 = eraseScreenTop;
-                }
-                else {
-                    erase0 = eraseScreenLeft;
-                }
-                var erase1 = eraseCenter;
-                var erase2;
-                if (y >= y1) {
-                    erase2 = eraseScreenTop;
-                }
-                else {
-                    erase2 = eraseScreenRight;
-                }
-                // System.println(Lang.format("left: $1$; right: $2$; top: $3$; bottom: $4$",
-                //         [eraseScreenLeft, eraseScreenRight, eraseScreenTop, eraseScreenBottom]));
+                // First, the row with -y:
+                {
+                    var erase0;
+                    if (y >= y1) { erase0 = eraseScreenUp; }
+                    else         { erase0 = eraseScreenLeft; }
+                    var erase1 = eraseCenter;
+                    var erase2;
+                    if (y >= y1) { erase2 = eraseScreenUp; }
+                    else         { erase2 = eraseScreenRight; }
 
-                if (erase0 and !erase1 and !erase2) {
-                    dc.setClip(0, radius + y, radius + minX+1, 1);
+                    // First and last pixels to erase; both are included
+                    var eraseL = -radius;
+                    var eraseR = radius;
+
+                    if (!erase0 and erase1)      { eraseL = -maxX+1; }
+                    else if (!erase1 and erase2) { eraseL = -minX;   }
+
+                    if (erase0 and !erase1)      { eraseR = -maxX;   }
+                    else if (erase1 and !erase2) { eraseR = -minX-1; }
+
+                    dc.setClip(radius + eraseL, radius - y, eraseR - eraseL + 1, 1);
                     dc.clear();
                 }
-                else if (erase0 and erase1 and !erase2) {
-                    dc.setClip(0, radius + y, radius + maxX, 1);
+
+                // Now, the row with +y:
+                {
+                    var erase0;
+                    if (y >= y1) { erase0 = eraseScreenDown; }
+                    else         { erase0 = eraseScreenLeft; }
+                    var erase1 = eraseCenter;
+                    var erase2;
+                    if (y >= y1) { erase2 = eraseScreenDown; }
+                    else         { erase2 = eraseScreenRight; }
+
+                    // First and last pixels to erase; both are included
+                    var eraseL = -radius;
+                    var eraseR = radius;
+
+                    if (!erase0 and erase1)      { eraseL = minX+1; }
+                    else if (!erase1 and erase2) { eraseL = maxX;   }
+
+                    if (erase0 and !erase1)      { eraseR = minX;   }
+                    else if (erase1 and !erase2) { eraseR = maxX-1; }
+
+                    dc.setClip(radius + eraseL, radius + y, eraseR - eraseL + 1, 1);
                     dc.clear();
                 }
-                else if (!erase0 and erase1 and !erase2) {
-                    dc.setClip(radius + minX+1, radius + y, maxX-minX-1, 1);
-                    dc.clear();
-                }
-                else if (!erase0 and erase1 and erase2) {
-                    dc.setClip(radius + minX+1, radius + y, radius*2, 1);
-                    dc.clear();
-                }
-                else if (!erase0 and !erase1 and erase2) {
-                    dc.setClip(radius + maxX, radius + y, radius*2, 1);
-                    dc.clear();
-                }
-                else if (erase0 and erase1 and erase2) {
-                    dc.setClip(0, radius + y, radius*2, 1);
-                    dc.clear();
-                }
-                else {
-                    System.println(Lang.format("Unexpected pattern: $1$, $2$, $3$", [erase0, erase1, erase2]));
-                }
-                // TODO: regionsMinus...
             }
         }
         dc.clearClip();
