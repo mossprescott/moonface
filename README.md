@@ -23,9 +23,12 @@ including an image for each step of rotating through 90°. On each update, the a
 is chosen, rendered into an offscreen buffer (with rotation in increments of 90°), and then
 the "dark" portion of the disk is erased.
 
-That erasing now turns out to be the bottleneck, with lots of geometry to find the exact pixel
-boundaries of the moon's image for each row of the image, and then a `Dc.clear()` call. The actual
-bitmap drawing is relatively quick, even with a rotation and scale transform involved.
+That erasing is fairly expensive, because we have to do `dc.setClip(); dc.clear()` once or twice
+on every single row. Now using a clever rasterization algorithm (Eberyly, 1999) to find the
+boundaries, which is a bunch of tricky code but much quicker than transforming pixel coords
+one at a time.
+
+The actual bitmap drawing is relatively quick, even with a rotation and scale transform involved.
 
 
 ## Limitations
