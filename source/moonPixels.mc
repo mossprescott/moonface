@@ -130,7 +130,7 @@ class MoonPixels {
 
         drawFullMoon(bufferDc, radius, adjustedAngle);
 
-        clearShadow(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
+        // clearShadow(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
         clearShadow2(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
 
         //
@@ -261,9 +261,10 @@ class MoonPixels {
         // Note: the y-axis is reversed on the display from the terms used here, so "up" means
         // increasing y, which is actually down on the screen.
 
-        // Note: this algorithm draws pixels that are definitely outside the ellipse. Probably want
+        // Note: this algorithm traces pixels that are definitely outside the ellipse. Probably want
         // to account for that by erasing to the inside edge of the traced outline.
 
+        // Select a point on each axis such that:
         // xa, ya: axis in the first quadrant (xa > 0, ya >= 0), with xa >= ya
         // xb, yb: axis in the second quadrant
 
@@ -287,16 +288,8 @@ class MoonPixels {
             tmp = ya; ya = yb; yb = tmp;
         }
 
-        // dc.setColor(Graphics.COLOR_RED, -1);
-        // dc.drawPoint(radius + xa, radius + ya);
-        // // dc.drawPoint(radius - xa, radius - ya);
-        // dc.setColor(Graphics.COLOR_BLUE, -1);
-        // dc.drawPoint(radius + xb, radius + yb);
-        // // dc.drawPoint(radius - xb, radius - yb);
-
-
         // The ellipse is points (x,y) where Ax^2 + 2Bxy + Cy^2 - D = 0
-        // Tricky: x(y)a(b) can be small, but not all of them. Using Double for eveything
+        // Tricky: x(y)a(b) can be small, but not all of them. Using Double for everything
         // avoids any early rounding. At the end, convert everything to Float, which the
         // VM handles more efficiently than Long. The paper uses 64-bit integers, because
         // we don't need any precision past the decimal point, but it was written when
@@ -309,8 +302,6 @@ class MoonPixels {
         var B = (xa*ya*bsqs + xb*yb*asqs).toFloat();
         var C = (ya*ya*bsqs + yb*yb*asqs).toFloat();
         var D = (asqs*bsqs).toFloat();
-        // System.println(Lang.format("($1$, $2$); ($3$, $4$)", [xa, ya, xb, yb]));
-        // System.println(Lang.format("$1$; $2$; $3$; $4$", [A/2.15e9, B/2.15e9, C/2.15e9, D/2.15e9]));
 
         // We'll accumulate every x-coord we trace for each non-negative y coord, then reduce them
         // afterward. This isn't the most efficient way to store them, but it makes the repeated code
@@ -445,12 +436,37 @@ class MoonPixels {
             }
         }
 
+        // Now look at the traced coords a row at a time and figure out which portion to erase.
+
+        // Of the three regions, inside and outside of the ellipse, which are in shadow and need
+        // to be erased. This is left/right in terms of the un-rotated image.
+        var eraseLeft = phase < 0.5;
+        var eraseCenter = 0.25 <= phase or phase >= 0.75;  // ?
+        var eraseRight = phase > 0.5;
+        var upIsLeft = Math.sin(parallacticAngle) > 0;
+        // System.println(Lang.format("angle: $1$; sin: $2$; cos: $3$", [parallacticAngle, Math.sin(parallacticAngle), Math.cos(parallacticAngle)]));
+        var leftIsRight = Math.cos(parallacticAngle) < 0;
+
+        // ya/yb, the one on the major axis:
+        var y1 = (Math.cos(parallacticAngle)*majorAxis).abs().toNumber();
+        // or do I need the y coord of the point where the tangent is vertical?
+        // var y2 = (Math.sqrt(D/A)*(B/C)).abs().toNumber();
+        // System.println(Lang.format("y1: $1$; y2: $2$", [y1, y2]));
+
         // FIXME: note re-definition of x and y
         for (var y = 0; y <= radius; y += 1) {
             var xs = xsByRow[y];
             var count = xs.size();
             if (count == 0) {
-                // no pixels in this row...
+                // This row is entirely outside the ellipse, so it's either all "left" or all "right".
+                if ((upIsLeft and eraseLeft) or (!upIsLeft and eraseRight)) {
+                    dc.setClip(0, radius - y, radius*2, 1);
+                    dc.clear();
+                }
+                if ((upIsLeft and eraseRight) or (!upIsLeft and eraseLeft)) {
+                    dc.setClip(0, radius + y, radius*2, 1);
+                    dc.clear();
+                }
             }
             else {
                 var minX = xs[0];
@@ -460,21 +476,75 @@ class MoonPixels {
                     if (x < minX) { minX = x; }
                     if (x > maxX) { maxX = x; }
                 }
-                dc.setColor(Graphics.COLOR_RED, -1);
-                dc.drawPoint(radius + minX, radius + y);
-                dc.drawPoint(radius - maxX, radius - y);
-                dc.setColor(Graphics.COLOR_GREEN, -1);
-                dc.drawPoint(radius + maxX, radius + y);
-                dc.drawPoint(radius - minX, radius - y);
-                dc.setStroke(0x330000FF);
-                dc.drawLine(radius + minX + 1, radius + y, radius + maxX, radius + y);
-                if (y > 0) {
-                    dc.drawLine(radius - maxX + 1, radius - y, radius - minX, radius - y);
+                if (true) {
+                    dc.clearClip();
+                    dc.setColor(leftIsRight ? Graphics.COLOR_GREEN : Graphics.COLOR_RED, -1);
+                    dc.drawPoint(radius + minX, radius + y);
+                    dc.drawPoint(radius - maxX, radius - y);
+                    dc.setColor(leftIsRight ? Graphics.COLOR_RED : Graphics.COLOR_GREEN, -1);
+                    dc.drawPoint(radius + maxX, radius + y);
+                    dc.drawPoint(radius - minX, radius - y);
+                // dc.setStroke(0x330000FF);
+                // dc.drawLine(radius + minX + 1, radius + y, radius + maxX, radius + y);
+                // if (y > 0) {
+                //     dc.drawLine(radius - maxX + 1, radius - y, radius - minX, radius - y);
+                // }
                 }
 
-                // TODO: decide which side of minX and maxX needs to be erased in each row and do it
+                // Note: top and bottom probably reversed here (top = positive y)
+                var eraseScreenLeft = leftIsRight ? eraseRight : eraseLeft;
+                var eraseScreenRight = leftIsRight ? eraseLeft : eraseRight;
+                var eraseScreenBottom = upIsLeft ? eraseLeft : eraseRight;
+                var eraseScreenTop = upIsLeft ? eraseRight : eraseLeft;
+                var erase0;
+                if (y >= y1) {
+                    erase0 = eraseScreenTop;
+                }
+                else {
+                    erase0 = eraseScreenLeft;
+                }
+                var erase1 = eraseCenter;
+                var erase2;
+                if (y >= y1) {
+                    erase2 = eraseScreenTop;
+                }
+                else {
+                    erase2 = eraseScreenRight;
+                }
+                // System.println(Lang.format("left: $1$; right: $2$; top: $3$; bottom: $4$",
+                //         [eraseScreenLeft, eraseScreenRight, eraseScreenTop, eraseScreenBottom]));
+
+                if (erase0 and !erase1 and !erase2) {
+                    dc.setClip(0, radius + y, radius + minX+1, 1);
+                    dc.clear();
+                }
+                else if (erase0 and erase1 and !erase2) {
+                    dc.setClip(0, radius + y, radius + maxX, 1);
+                    dc.clear();
+                }
+                else if (!erase0 and erase1 and !erase2) {
+                    dc.setClip(radius + minX+1, radius + y, maxX-minX-1, 1);
+                    dc.clear();
+                }
+                else if (!erase0 and erase1 and erase2) {
+                    dc.setClip(radius + minX+1, radius + y, radius*2, 1);
+                    dc.clear();
+                }
+                else if (!erase0 and !erase1 and erase2) {
+                    dc.setClip(radius + maxX, radius + y, radius*2, 1);
+                    dc.clear();
+                }
+                else if (erase0 and erase1 and erase2) {
+                    dc.setClip(0, radius + y, radius*2, 1);
+                    dc.clear();
+                }
+                else {
+                    System.println(Lang.format("Unexpected pattern: $1$, $2$, $3$", [erase0, erase1, erase2]));
+                }
+                // TODO: regionsMinus...
             }
         }
+        dc.clearClip();
     }
 
     private function getBuffer(radius as Number) as BufferedBitmap {
