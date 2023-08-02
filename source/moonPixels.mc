@@ -138,10 +138,6 @@ class MoonPixels {
         // Finally, copy the completed image to the destination:
         //
         dc.drawBitmap(centerX - radius, centerY - radius, buffer);
-
-        // TEMP: verify placement
-        // dc.setColor(Graphics.COLOR_RED, -1);
-        // dc.drawCircle(centerX, centerY, radius);
     }
 
     // Draw the entire disk in the current orientation:
@@ -212,6 +208,8 @@ class MoonPixels {
         var ya = Math.cos(parallacticAngle)*majorAxis;
 
         // Choose minor axis, avoiding very small values which could trigger edge cases:
+        // FIXME: something physically realistic?
+        // FIXME: adjust duration of (apparent) new moon to be satisfying
         var minorAxis = majorAxis*(2*illuminationFraction - 1).abs();
         if (minorAxis < 1.0) { minorAxis = 1.5d; }
         var xb = Math.cos(parallacticAngle)*minorAxis;
@@ -262,8 +260,6 @@ class MoonPixels {
             var y = Math.round(-ya).toNumber();
             var dx = B*x + C*y;
             var dy = -(A*x + B*y);
-
-            // System.println(Lang.format("dx: $1$", [dx]));
 
             // First advance to a point where the magnitude of slope is >= 1, without
             // recording any pixels:
@@ -383,7 +379,6 @@ class MoonPixels {
         var eraseCenter = illuminationFraction < 0.5;
         var eraseRight = phase > 0.5;
         var upIsLeft = Math.sin(parallacticAngle) > 0;
-        // System.println(Lang.format("angle: $1$; sin: $2$; cos: $3$", [parallacticAngle, Math.sin(parallacticAngle), Math.cos(parallacticAngle)]));
         var leftIsRight = Math.cos(parallacticAngle) < 0;
 
         // Reflect regions based on current rotation:
