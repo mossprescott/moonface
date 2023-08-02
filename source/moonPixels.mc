@@ -504,18 +504,29 @@ class MoonPixels {
                     if (y >= y1) { erase2 = eraseScreenUp; }
                     else         { erase2 = eraseScreenRight; }
 
-                    // First and last pixels to erase; both are included
-                    var eraseL = -radius;
-                    var eraseR = radius;
+                    if (erase0 and !erase1 and erase2) {
+                        // Erase on each side:
+                        dc.setClip(radius + -radius, radius - y, -maxX - (-radius) + 1, 1);
+                        dc.clear();
+                        dc.setClip(radius + -minX, radius - y, radius - (-minX) + 1, 1);
+                        dc.clear();
+                    }
+                    else if (erase0 or erase1 or erase2) {
+                        // Erase one or two regions on the same side at once:
 
-                    if (!erase0 and erase1)      { eraseL = -maxX+1; }
-                    else if (!erase1 and erase2) { eraseL = -minX;   }
+                        // First and last pixels to erase; both are included
+                        var eraseL = -radius;
+                        var eraseR = radius;
 
-                    if (erase0 and !erase1)      { eraseR = -maxX;   }
-                    else if (erase1 and !erase2) { eraseR = -minX-1; }
+                        if (!erase0 and erase1)      { eraseL = -maxX+1; }
+                        else if (!erase1 and erase2) { eraseL = -minX;   }
 
-                    dc.setClip(radius + eraseL, radius - y, eraseR - eraseL + 1, 1);
-                    dc.clear();
+                        if (erase0 and !erase1)      { eraseR = -maxX;   }
+                        else if (erase1 and !erase2) { eraseR = -minX-1; }
+
+                        dc.setClip(radius + eraseL, radius - y, eraseR - eraseL + 1, 1);
+                        dc.clear();
+                    }
                 }
 
                 // Now, the row with +y:
