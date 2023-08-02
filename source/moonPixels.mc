@@ -128,6 +128,8 @@ class MoonPixels {
         // more nicely.
         var adjustedAngle = stepAngle*Math.round(parallacticAngle/stepAngle);
 
+        // System.println(Lang.format("angle: $1$; phase: $2$; fraction: $3$", [adjustedAngle, phase, illuminationFraction]));
+
         drawFullMoon(bufferDc, radius, adjustedAngle);
 
         clearShadow(bufferDc, radius, adjustedAngle, illuminationFraction, phase);
@@ -136,10 +138,6 @@ class MoonPixels {
         // Finally, copy the completed image to the destination:
         //
         dc.drawBitmap(centerX - radius, centerY - radius, buffer);
-
-        // TEMP: verify placement
-        // dc.setColor(Graphics.COLOR_RED, -1);
-        // dc.drawCircle(centerX, centerY, radius);
     }
 
     // Draw the entire disk in the current orientation:
@@ -181,67 +179,325 @@ class MoonPixels {
         }
     }
 
-    // Erase portions of the moon's image that are currently in shadow.
+    // Use a clever ellipse-tracing algorithm to find the pixels in each row that are on the border
+    // of the ellipse which defines the edge of the shadow. Then some quick checks to determine
+    // which part of each row — with respect to the ellipse boundary — needs to be erased.
     //
-    // In each row, test to see which portion of the pixels is visible, and use binary search
-    // to find the edge in image space. For skinny crescents, that reduces the number of
-    // ellipse calculations from a max of O(2*radius) ~= 60 to about O(log(2*radius)) ~= 8
-    // (plus an inevitable few per row).
+    // Adapted from "Integer-based Algorithm for Drawing Ellipses" (Eberly, 1999).
+    //
+    // Note: it would be a lot more readable to factor out all of the bumping/testing/recording into
+    // small methods somewhere. Unfortunately, that's about 2x slower, according to the simulator's
+    // profiler. That's plausible, because of all the method calls and member references. Keeping it
+    // all in one ugly function means only fast local variable access, even though the code is larger
+    // and uglier.
     private function clearShadow(dc as Dc, radius as Number,
                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
-        // Note: Dc.clear seems to be the only way to write transparent pixels over the top of
-        // previous drawing. Although it seems like it might be expensive, it probably doesn't
-        // compare to the actual geometry we're doing.
 
-        var calc = new MoonFaceCalculator(radius, parallacticAngle, illuminationFraction, phase);
+        // Note: the y-axis is reversed on the display from the terms used here, so "up" means
+        // increasing y, which is actually down on the screen.
 
-        for (var y = -radius; y < radius; y += 1) {
-            calc.setRow(y);
+        // Note: this algorithm traces pixels that are definitely outside the ellipse. Probably want
+        // to account for that by erasing to the inside edge of the traced outline.
 
-            if (!calc.illuminated(calc.minX)) {
-                // Some pixels on the left are dark:
+        // Select a point on each axis such that:
+        // xa, ya: axis in the first quadrant (xa > 0, ya >= 0), with xa >= ya
+        // xb, yb: axis in the second quadrant
 
-                // Note: clear all the way to the left edge, just in case there are any stray
-                // pixels in the source image (because there are).
-                var firstDarkX = -radius;
+        var majorAxis = (radius + 0.5).toDouble();
+        var xa = -Math.sin(parallacticAngle)*majorAxis;
+        var ya = Math.cos(parallacticAngle)*majorAxis;
 
-                // Similarly, if the entire row is dark, and make sure to clear all the way to the
-                // right edge.
-                var lastDarkX = calc.lastNonIlluminated(calc.minX, calc.maxX);
-                if (lastDarkX == calc.maxX) {
-                    lastDarkX = radius;
+        // Choose minor axis, avoiding very small values which could trigger edge cases:
+        // FIXME: something physically realistic?
+        // FIXME: adjust duration of (apparent) new moon to be satisfying
+        var minorAxis = majorAxis*(2*illuminationFraction - 1).abs();
+        if (minorAxis < 1.0) { minorAxis = 1.5d; }
+        var xb = Math.cos(parallacticAngle)*minorAxis;
+        var yb = Math.sin(parallacticAngle)*minorAxis;
+
+        // Choose coords such that ya and yb >= 0:
+        if (ya < 0) { xa = -xa; ya = -ya; }
+        if (yb < 0) { xb = -xb; yb = -yb; }
+        // ... and xa > 0:
+        if (xa < 0) {
+            var tmp;
+            tmp = xa; xa = xb; xb = tmp;
+            tmp = ya; ya = yb; yb = tmp;
+        }
+
+        // The ellipse is points (x,y) where Ax^2 + 2Bxy + Cy^2 - D = 0
+        // Tricky: x(y)a(b) can be small, but not all of them. Using Double for everything
+        // avoids any early rounding. At the end, convert everything to Float, which the
+        // VM handles more efficiently than Long. The paper uses 64-bit integers, because
+        // we don't need any precision past the decimal point, but it was written when
+        // floating-point wasn't cheap the way it probably is now.
+        var asq = xa*xa + ya*ya;
+        var asqs = asq*asq;
+        var bsq = xb*xb + yb*yb;
+        var bsqs = bsq*bsq;
+        var A = (xa*xa*bsqs + xb*xb*asqs).toFloat();
+        var B = (xa*ya*bsqs + xb*yb*asqs).toFloat();
+        var C = (ya*ya*bsqs + yb*yb*asqs).toFloat();
+        var D = (asqs*bsqs).toFloat();
+
+        // We'll accumulate every x-coord we trace for each non-negative y coord, then reduce them
+        // afterward. This isn't the most efficient way to store them, but it makes the repeated code
+        // simple, and we know the total number of such coords is O(radius).
+        var maxRow = radius+2;  // Not sure why we need this much margin, but otherwise we get overflow.
+        var xsByRow = new Array<Array<Number>>[maxRow+1];
+        for (var i = 0; i <= maxRow; i += 1) { xsByRow[i] = []; }
+
+        if ((A == 0.0 and B == 0.0) or (C == 0.0 and D == 0.0)) {
+            System.println("Zero coefficients! Skip for now");
+        }
+        // else if (xa == 0) {
+        //     System.println("xa is 0. Skip for now");
+        //     // Axis-aligned:
+        //     // Necessary because zero coefficients create infinite loops?
+        // }
+        else {
+            var x = Math.round(-xa).toNumber();
+            var y = Math.round(-ya).toNumber();
+            var dx = B*x + C*y;
+            var dy = -(A*x + B*y);
+
+            // First advance to a point where the magnitude of slope is >= 1, without
+            // recording any pixels:
+            if (x > y) {
+                // Arc 0: (-xa, -ya) left and maybe up until the slope is -1; x-- (y++)
+                while (-dy > dx) {
+                    // Choose between (x-1, y) and (x-1, y+1).
+                    // Test (x-1, y+1); if inside, then go to (x-1, y), otherwise (x-1, y+1)
+                    x -= 1;
+                    var sigma = A*x*x + 2*B*x*(y+1) + C*(y+1)*(y+1) - D;
+                    if (sigma >= 0) {
+                        dx += C;
+                        dy -= B;
+                        y += 1;
+                    }
+                    dx -= B;
+                    dy += A;
                 }
-
-                dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
-                dc.clear();
             }
-            else if (!calc.illuminated(calc.maxX)) {
-                // Some pixels on the right are dark:
-                // Note: in this case, we know that minX is not dark.
 
-                var firstDarkX = calc.lastIlluminated(calc.minX, calc.maxX) + 1;
+            // Arc 1: up and maybe left until the tangent is vertical; y++ (x--)
+            while (dx <= 0) {
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
 
-                // Note: clear all the way to the right edge, just in case there are any stray
-                // pixels in the source image (because there are).
-                var lastDarkX = radius;
-
-                dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
-                dc.clear();
+                // Choose between (x, y+1) and (x-1, y+1).
+                // Test (x, y+1); if inside, then go to (x-1, y+1), otherwise (x, y+1)
+                y += 1;
+                var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+                if (sigma < 0) {
+                    dx -= B;
+                    dy += A;
+                    x -= 1;
+                }
+                dx += C;
+                dy -= B;
             }
-            else if (!calc.illuminated(0)) {
-                // Some pixels in the middle are dark (i.e. a rotated crescent):
-                // Note: we know minX and maxX are not dark
 
-                // FIXME: currently adding an extra pixel on either side to reduce jaggies, but
-                // this is probably too much, meaning there's never any true new moon.
-                var firstDarkX = calc.lastIlluminated(calc.minX, 0) + 2;
-                var lastDarkX = calc.lastNonIlluminated(0, calc.maxX) - 1;
+            // Arc 2: up and maybe right until slope = 1; y++ (x++)
+            while (dy > dx) {
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
 
-                dc.setClip(radius + firstDarkX, radius + y, lastDarkX - firstDarkX, 1);
-                dc.clear();
+                // Choose between (x, y+1) and (x+1, y+1).
+                // Test (x+1, y+1); if inside, then go to (x, y+1), otherwise (x+1, y+1)
+                y += 1;
+                var sigma = A*(x+1)*(x+1) + 2*B*(x+1)*y + C*y*y - D;
+                if (sigma >= 0) {
+                    dx += B;
+                    dy -= A;
+                    x += 1;
+                }
+                dx += C;
+                dy -= B;
+            }
+
+            // Arc 3: right and maybe up until tangent is horizontal; x++ (y++)
+            while (dy >= 0) {
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
+
+                // Choose between (x+1, y) and (x+1, y+1).
+                // Test (x+1, y); if inside, then go to (x+1, y+1), otherwise (x+1, y)
+                x += 1;
+                var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+                if (sigma < 0) {
+                    dx += C;
+                    dy -= B;
+                    y += 1;
+                }
+                dx += B;
+                dy -= A;
+            }
+
+            // Arc 4: right and maybe down until the slope is -1; x++ (y--)
+            while (-dy < dx) {
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
+
+                // Choose between (x+1, y) and (x+1, y-1).
+                // Test (x+1, y-1); if inside, then go to (x+1, y), otherwise (x+1, y-1)
+                x += 1;
+                var sigma = A*x*x + 2*B*x*(y-1) + C*(y-1)*(y-1) - D;
+                if (sigma >= 0) {
+                    dx -= C;
+                    dy += B;
+                    y -= 1;
+                }
+                dx += B;
+                dy -= A;
+            }
+
+            // Arc 5: down and maybe right until (xa, ya); y-- (x++)
+            while (y > ya) {
+                if (y >= 0) { xsByRow[ y].add( x); }
+                if (y <= 0) { xsByRow[-y].add(-x); }
+
+                // Choose between (x, y-1) and (x+1, y-1).
+                // Test (x, y-1); if inside, then go to (x+1, y-1), otherwise (x, y-1)
+                y -= 1;
+                var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+                if (sigma < 0) {
+                    dx += B;
+                    dy -= A;
+                    x += 1;
+                }
+                dx -= C;
+                dy += B;
             }
         }
 
+        // Now look at the traced coords a row at a time and figure out which portion to erase.
+
+        // Of the three regions, inside and outside of the ellipse, which are in shadow and need
+        // to be erased. This is left/right in terms of the un-rotated image.
+        var eraseLeft = phase < 0.5;
+        var eraseCenter = illuminationFraction < 0.5;
+        var eraseRight = phase > 0.5;
+        var upIsLeft = Math.sin(parallacticAngle) > 0;
+        var leftIsRight = Math.cos(parallacticAngle) < 0;
+
+        // Reflect regions based on current rotation:
+        var eraseScreenLeft = leftIsRight ? eraseRight : eraseLeft;
+        var eraseScreenRight = leftIsRight ? eraseLeft : eraseRight;
+        var eraseScreenUp = upIsLeft ? eraseLeft : eraseRight;
+        var eraseScreenDown = upIsLeft ? eraseRight : eraseLeft;
+
+        // Positive y-coord of the point on the major axis (aka ya, before selecting for quadrants):
+        var y1 = (Math.cos(parallacticAngle)*majorAxis).abs().toNumber();
+
+        // FIXME: note re-definition of x and y
+        for (var y = 0; y <= radius; y += 1) {
+            var xs = xsByRow[y];
+            var count = xs.size();
+            if (count == 0) {
+                // This row is entirely outside the ellipse, so it's either all "left" or all "right".
+                if ((upIsLeft and eraseLeft) or (!upIsLeft and eraseRight)) {
+                    dc.setClip(0, radius - y, radius*2, 1);
+                    dc.clear();
+                }
+                if ((upIsLeft and eraseRight) or (!upIsLeft and eraseLeft)) {
+                    dc.setClip(0, radius + y, radius*2, 1);
+                    dc.clear();
+                }
+            }
+            else {
+                var minX = xs[0];
+                var maxX = xs[0];
+                for (var i = 1; i < count; i += 1) {
+                    var x = xs[i] as Number;
+                    if (x < minX) { minX = x; }
+                    if (x > maxX) { maxX = x; }
+                }
+
+                if (false) {
+                    // For debug purposes, render the ellipse boundaries in each row.
+                    // Note: the boundary pixels are considered to be outside of "center",
+                    // so they get erased along with the left/right region.
+                    dc.clearClip();
+                    dc.setColor(leftIsRight ? Graphics.COLOR_GREEN : Graphics.COLOR_RED, -1);
+                    dc.drawPoint(radius + minX, radius + y);
+                    dc.drawPoint(radius - maxX, radius - y);
+                    dc.setColor(leftIsRight ? Graphics.COLOR_RED : Graphics.COLOR_GREEN, -1);
+                    dc.drawPoint(radius + maxX, radius + y);
+                    dc.drawPoint(radius - minX, radius - y);
+                }
+
+                // First, the row with -y:
+                {
+                    var erase0;
+                    if (y >= y1) { erase0 = eraseScreenUp; }
+                    else         { erase0 = eraseScreenLeft; }
+                    var erase1 = eraseCenter;
+                    var erase2;
+                    if (y >= y1) { erase2 = eraseScreenUp; }
+                    else         { erase2 = eraseScreenRight; }
+
+                    if (erase0 and !erase1 and erase2) {
+                        // Erase on each side:
+                        dc.setClip(radius + -radius, radius - y, -maxX - (-radius) + 1, 1);
+                        dc.clear();
+                        dc.setClip(radius + -minX, radius - y, radius - (-minX) + 1, 1);
+                        dc.clear();
+                    }
+                    else if (erase0 or erase1 or erase2) {
+                        // Erase one or two regions on the same side at once:
+
+                        // First and last pixels to erase; both are included
+                        var eraseL = -radius;
+                        var eraseR = radius;
+
+                        if (!erase0 and erase1)      { eraseL = -maxX+1; }
+                        else if (!erase1 and erase2) { eraseL = -minX;   }
+
+                        if (erase0 and !erase1)      { eraseR = -maxX;   }
+                        else if (erase1 and !erase2) { eraseR = -minX-1; }
+
+                        dc.setClip(radius + eraseL, radius - y, eraseR - eraseL + 1, 1);
+                        dc.clear();
+                    }
+                }
+
+                // Now, the row with +y:
+                {
+                    var erase0;
+                    if (y >= y1) { erase0 = eraseScreenDown; }
+                    else         { erase0 = eraseScreenLeft; }
+                    var erase1 = eraseCenter;
+                    var erase2;
+                    if (y >= y1) { erase2 = eraseScreenDown; }
+                    else         { erase2 = eraseScreenRight; }
+
+                    if (erase0 and !erase1 and erase2) {
+                        // Erase on each side:
+                        dc.setClip(radius + -radius, radius + y, minX - (-radius) + 1, 1);
+                        dc.clear();
+                        dc.setClip(radius + maxX, radius + y, radius - maxX + 1, 1);
+                        dc.clear();
+                    }
+                    else if (erase0 or erase1 or erase2) {
+                        // Erase one or two regions on the same side at once:
+
+                        // First and last pixels to erase; both are included
+                        var eraseL = -radius;
+                        var eraseR = radius;
+
+                        if (!erase0 and erase1)      { eraseL = minX+1; }
+                        else if (!erase1 and erase2) { eraseL = maxX;   }
+
+                        if (erase0 and !erase1)      { eraseR = minX;   }
+                        else if (erase1 and !erase2) { eraseR = maxX-1; }
+
+                        dc.setClip(radius + eraseL, radius + y, eraseR - eraseL + 1, 1);
+                        dc.clear();
+                    }
+                }
+            }
+        }
         dc.clearClip();
     }
 
@@ -267,178 +523,6 @@ class MoonPixels {
             System.error("no buffer");
         }
     }
-}
-
-
-// Geometry to figure out which pixels need to be drawn, based on a particular rotation and phase
-// of the moon.
-//
-// Note: there's overhead in the VM to access object fields, as well as to call the methods,
-// but hopefully this will allow for an improved algorithm (i.e. binary search).
-class MoonFaceCalculator {
-    // var radius as Number;
-    // var parallacticAngle as Decimal;
-    // var illuminationFraction as Decimal;
-    // var phase as Decimal;
-
-    private var t11 as Float;
-    private var t21 as Float;
-    private var rsq as Float;
-
-    private var drawRight as Boolean;
-    private var drawCenter as Boolean;
-    private var drawLeft as Boolean;
-
-    private var asq as Float;
-    private var bsq as Float;
-    private var absq as Float;
-
-    private var y as Number;
-    // private var x as Number;
-
-    //
-    // Visible to the caller:
-    //
-
-    // Coords of the current point, in image space:
-    public var mx as Float;
-    public var my as Float;
-
-    // Minumum and maximum x-coords for the row, based on the circular disk only (not the current phase):
-    public var minX as Number;
-    public var maxX as Number;
-
-    function initialize(radius as Number, parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) {
-        // A bogus factor relative to which some pixel-level adjustments are made. Used to be the
-        // size of the array of raw samples, not that that actually meant anything here.
-        var SIZE = 128;
-
-        var scale = (SIZE/2)/radius.toFloat();
-        t11 = (Math.cos(-parallacticAngle)*scale).toFloat();
-        t21 = (Math.sin(-parallacticAngle)*scale).toFloat();
-        rsq = (radius*radius).toFloat();
-
-        // Half the minor axis of an ellipse defining the edge of the illuminated part of the moon.
-        // Note: I suspect an ellipse isn't actually quite the correct shape, but at this resolution
-        // it's probably close enough.
-        var a;
-        if (illuminationFraction < 0.5) {
-            // Just trying the get this approximately realistic:
-            // - some sliver of the moon visible except within ~24 hours of the new moon.
-            a = (SIZE/2 - 4)*(1 - 2*illuminationFraction);
-            // System.println(Lang.format("a: $1$", [a]));
-        } else {
-            a = (SIZE/2 - 4)*(2*illuminationFraction - 1);
-            // System.println(Lang.format("(-)a: $1$", [a]));
-        }
-        drawRight = phase <= 0.5;
-        drawCenter = 0.25 < phase and phase < 0.75;  // ?
-        drawLeft = phase >= 0.5;
-        // System.println(Lang.format("$1$; $2$; $3$", [drawLeft, drawCenter, drawRight]));
-
-        var b = SIZE/2;
-        asq = (a*a).toFloat();
-        bsq = (b*b).toFloat();
-        absq = asq*bsq;
-
-        y = 0;
-        mx = 0.0;
-        my = 0.0;
-        minX = 0;
-        maxX = 0;
-    }
-
-    function setRow(y as Number) as Void {
-        self.y = y;
-
-        // Note: effectively, truncating the real value to an int seems to force it to lie
-        // within the disk.
-        maxX = Math.sqrt(rsq - y*y).toNumber();
-        minX = -maxX;
-    }
-
-    // True if the pixel at (x, y) needs to be drawn. After this call, (mx, my) contains
-    // image-space coords.
-    function illuminated(x as Number) as Boolean {
-        // This check is redundant if minX and maxX are used.
-        // if (y*y + x*x > rsq) {
-        //     // Skip some calculation; the point is clearly outside the disk
-        //     return false;
-        // }
-
-        // Note: could save some multiplication by computing dx and dy once at
-        // start of each row. But that's probably not where the time is at the moment.
-        mx = x*t11 - y*t21;
-        my = x*t21 + y*t11;
-
-        // Is this pixel towards the center of the moon's image, relative to the ellipse
-        // that defines the edge of the illuminated area?
-        var inside = bsq*mx*mx + asq*my*my < absq;
-        if (inside) {
-            if (!drawCenter) {
-                return false;
-            }
-        }
-        else {
-            if (mx < 0 and !drawLeft) {
-                return false;
-            }
-            else if (mx > 0 and !drawRight) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    // Binary search to find the greatest x between lo and hi, inclusive, such that
-    // calc.illuminated(x) is false.
-    // Assumptions: the pixels between lo and hi form a single (possibly empty) non-illuminated
-    // region on the left, followed by a single (possibly empty) illuminated region on the right.
-    // If there are any extraneous pixels, the result could be just a random non-illuminated
-    // pixel.
-    function lastNonIlluminated(lo as Number, hi as Number) as Number {
-        // invariant: !calc.illuminated(lo) (assumed, at the start)
-
-        // Short-circuit this relatively common case, to produce the right result
-        // and keep the calculation of mid simple within the loop.
-        if (!illuminated(hi)) {
-            return hi;
-        }
-
-        while (hi > lo+1) {
-            var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
-            if (!illuminated(mid)) {
-                lo = mid;
-            }
-            else {
-                hi = mid;
-            }
-        }
-        return lo;
-    }
-
-    // Binary search to find the least x between lo and hi, inclusive, such that
-    // calc.illuminated(x) is false.
-    // Assumptions: the pixels between lo and hi form a single (possibly empty) illuminated region
-    // on the left, followed by a single (possibly empty) non-illuminated region on the right.
-    // If there are any extraneous pixels, the result could be just a random *illuminated*
-    // pixel.
-    function lastIlluminated(lo as Number, hi as Number) as Number {
-        // invariant: calc.illuminated(lo) (assumed, at the start)
-
-        while (hi > lo+1) {
-            var mid = (lo + hi)/2;  // Tricky: when both are < 0 and 1 apart, this truncates to hi
-            if (illuminated(mid)) {
-                lo = mid;
-            }
-            else {
-                hi = mid;
-            }
-        }
-        return hi;
-    }
-
 }
 
 (:test)

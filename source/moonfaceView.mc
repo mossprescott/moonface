@@ -195,15 +195,27 @@ class moonfaceView extends WatchUi.WatchFace {
         // Drawn after the time, which can overlap it slightly
         drawCompass(dc, facingSouth);
 
-        // The moon can overlap the time when it's low in the sky and close to full.
-        var moonPosition = Orbits.moonPosition(now, location);
-        // TODO: don't recalculate the illumination every time
-        var moonIllumination = Orbits.moonIllumination(now);
-        // System.println(moonIllumination);
-        drawMoon(dc, moonPosition[:azim] as Float, moonPosition[:alt] as Float,
-                moonPosition[:parallacticAngle] as Float,
-                moonIllumination[:fraction] as Float, moonIllumination[:phase] as Float,
-                facingSouth);
+        var MOON_DEBUG = false;
+        if (MOON_DEBUG) {
+            var framesPerRotation = 300;
+            var framesPerCycle = 103;  // roughly a multiple but not quite to hit more combinations
+            var angle = 2*Math.PI*frameCount/framesPerRotation;
+            var phase = (frameCount % framesPerCycle) / framesPerCycle.toFloat();
+            var fraction = Math.sin(Math.PI*phase);
+            moonPixels.draw(dc, dc.getWidth()/2, dc.getHeight()/3, moonPixels.getNativeRadius(),
+                    angle, fraction, phase);
+        }
+        else {
+            // The moon can overlap the time when it's low in the sky and close to full.
+            var moonPosition = Orbits.moonPosition(now, location);
+            // TODO: don't recalculate the illumination every time
+            var moonIllumination = Orbits.moonIllumination(now);
+            // System.println(moonIllumination);
+            drawMoon(dc, moonPosition[:azim] as Float, moonPosition[:alt] as Float,
+                    moonPosition[:parallacticAngle] as Float,
+                    moonIllumination[:fraction] as Float, moonIllumination[:phase] as Float,
+                    facingSouth);
+        }
 
         dc.setColor(palette.time, -1);
 
