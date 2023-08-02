@@ -195,13 +195,13 @@ class moonfaceView extends WatchUi.WatchFace {
         // Drawn after the time, which can overlap it slightly
         drawCompass(dc, facingSouth);
 
-        var MOON_DEBUG = true;
+        var MOON_DEBUG = false;
         if (MOON_DEBUG) {
-            var framesPerRotation = 100;
-            var framesPerCycle = 421;  // roughly a multiple but not quite to hit more combinations
+            var framesPerRotation = 300;
+            var framesPerCycle = 103;  // roughly a multiple but not quite to hit more combinations
             var angle = 2*Math.PI*frameCount/framesPerRotation;
-            var fraction = (Math.cos(2*Math.PI*frameCount/framesPerCycle) + 1)/2;
             var phase = (frameCount % framesPerCycle) / framesPerCycle.toFloat();
+            var fraction = Math.sin(Math.PI*phase);
             moonPixels.draw(dc, dc.getWidth()/2, dc.getHeight()/3, moonPixels.getNativeRadius(),
                     angle, fraction, phase);
         }
