@@ -441,7 +441,7 @@ class MoonPixels {
         // Of the three regions, inside and outside of the ellipse, which are in shadow and need
         // to be erased. This is left/right in terms of the un-rotated image.
         var eraseLeft = phase < 0.5;
-        var eraseCenter = 0.25 <= phase or phase >= 0.75;  // ?
+        var eraseCenter = 0.25 >= phase or phase >= 0.75;  // ?
         var eraseRight = phase > 0.5;
         var upIsLeft = Math.sin(parallacticAngle) > 0;
         // System.println(Lang.format("angle: $1$; sin: $2$; cos: $3$", [parallacticAngle, Math.sin(parallacticAngle), Math.cos(parallacticAngle)]));
