@@ -243,7 +243,7 @@ class MoonPixels {
         // We'll accumulate every x-coord we trace for each non-negative y coord, then reduce them
         // afterward. This isn't the most efficient way to store them, but it makes the repeated code
         // simple, and we know the total number of such coords is O(radius).
-        var maxRow = radius+2;  // Not sure why we need this much margin, but otherwise we get overflow.
+        var maxRow = radius;
         var xsByRow = new Array<Array<Number>>[maxRow+1];
         for (var i = 0; i <= maxRow; i += 1) { xsByRow[i] = []; }
 
@@ -282,8 +282,8 @@ class MoonPixels {
 
             // Arc 1: up and maybe left until the tangent is vertical; y++ (x--)
             while (dx <= 0) {
-                if (y >= 0) { xsByRow[ y].add( x); }
-                if (y <= 0) { xsByRow[-y].add(-x); }
+                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
 
                 // Choose between (x, y+1) and (x-1, y+1).
                 // Test (x, y+1); if inside, then go to (x-1, y+1), otherwise (x, y+1)
@@ -300,8 +300,8 @@ class MoonPixels {
 
             // Arc 2: up and maybe right until slope = 1; y++ (x++)
             while (dy > dx) {
-                if (y >= 0) { xsByRow[ y].add( x); }
-                if (y <= 0) { xsByRow[-y].add(-x); }
+                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
 
                 // Choose between (x, y+1) and (x+1, y+1).
                 // Test (x+1, y+1); if inside, then go to (x, y+1), otherwise (x+1, y+1)
@@ -318,8 +318,8 @@ class MoonPixels {
 
             // Arc 3: right and maybe up until tangent is horizontal; x++ (y++)
             while (dy >= 0) {
-                if (y >= 0) { xsByRow[ y].add( x); }
-                if (y <= 0) { xsByRow[-y].add(-x); }
+                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
 
                 // Choose between (x+1, y) and (x+1, y+1).
                 // Test (x+1, y); if inside, then go to (x+1, y+1), otherwise (x+1, y)
@@ -336,8 +336,8 @@ class MoonPixels {
 
             // Arc 4: right and maybe down until the slope is -1; x++ (y--)
             while (-dy < dx) {
-                if (y >= 0) { xsByRow[ y].add( x); }
-                if (y <= 0) { xsByRow[-y].add(-x); }
+                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
 
                 // Choose between (x+1, y) and (x+1, y-1).
                 // Test (x+1, y-1); if inside, then go to (x+1, y), otherwise (x+1, y-1)
@@ -354,8 +354,8 @@ class MoonPixels {
 
             // Arc 5: down and maybe right until (xa, ya); y-- (x++)
             while (y > ya) {
-                if (y >= 0) { xsByRow[ y].add( x); }
-                if (y <= 0) { xsByRow[-y].add(-x); }
+                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
 
                 // Choose between (x, y-1) and (x+1, y-1).
                 // Test (x, y-1); if inside, then go to (x+1, y-1), otherwise (x, y-1)
