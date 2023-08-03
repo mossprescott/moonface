@@ -414,19 +414,6 @@ class MoonPixels {
                     if (x > maxX) { maxX = x; }
                 }
 
-                if (false) {
-                    // For debug purposes, render the ellipse boundaries in each row.
-                    // Note: the boundary pixels are considered to be outside of "center",
-                    // so they get erased along with the left/right region.
-                    dc.clearClip();
-                    dc.setColor(leftIsRight ? Graphics.COLOR_GREEN : Graphics.COLOR_RED, -1);
-                    dc.drawPoint(radius + minX, radius + y);
-                    dc.drawPoint(radius - maxX, radius - y);
-                    dc.setColor(leftIsRight ? Graphics.COLOR_RED : Graphics.COLOR_GREEN, -1);
-                    dc.drawPoint(radius + maxX, radius + y);
-                    dc.drawPoint(radius - minX, radius - y);
-                }
-
                 // First, the row with -y:
                 {
                     var erase0;
@@ -495,6 +482,20 @@ class MoonPixels {
                         dc.setClip(radius + eraseL, radius + y, eraseR - eraseL + 1, 1);
                         dc.clear();
                     }
+                }
+
+                var DEBUG_ELLIPSE = true;
+                if (DEBUG_ELLIPSE) {
+                    // For debug purposes, render the ellipse boundaries in each row.
+                    // Note: the boundary pixels are considered to be outside of "center",
+                    // so they draw on top of the left/right region.
+                    dc.clearClip();
+                    dc.setColor(leftIsRight ? Graphics.COLOR_GREEN : Graphics.COLOR_RED, -1);
+                    dc.drawPoint(radius + minX, radius + y);
+                    dc.drawPoint(radius - maxX, radius - y);
+                    dc.setColor(leftIsRight ? Graphics.COLOR_RED : Graphics.COLOR_GREEN, -1);
+                    dc.drawPoint(radius + maxX, radius + y);
+                    dc.drawPoint(radius - minX, radius - y);
                 }
             }
         }
