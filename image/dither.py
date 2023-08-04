@@ -31,9 +31,10 @@ def main():
     def imageId(r, s): return f"Moon{radius}_{i:02d}"
 
     radius = 35
+    size = 2*radius + 1
     steps = 50  # Note: radius*π/2 or about radius*1.5 would be one-pixel steps around the perimeter
     for i in range(steps):
-        img = munge(src, 90*i/steps, radius)
+        img = munge(src, 90*i/steps, size)
         img.save(f"{dir}/resources/drawables/{imageName(radius, i)}")
 
     with open(f"{dir}/resources/drawables/moon.xml", mode="w") as indexFile:
@@ -58,17 +59,17 @@ module MoonImages {{
 }
 """)
 
+    ICON_SIZE = 40
+    icon = munge(src, 0, ICON_SIZE)
+    icon.save(f"{dir}/resources/drawables/launcher_icon{ICON_SIZE}.png")
 
-    icon = munge(src, 0, 20)
-    icon.save(f"{dir}/resources/drawables/launcher_icon40.png")
 
-
-def munge(img, angle, radius):
+def munge(img, angle, size):
     """Rotate, resize, and dither (in that order)."""
 
     img = img.rotate(-angle, resample=Resampling.BICUBIC, fillcolor=(0, 0, 0))
 
-    img = img.resize((2*radius + 1, 2*radius + 1), resample=Resampling.BICUBIC)
+    img = img.resize((size, size), resample=Resampling.BICUBIC)
 
     img = dither_mask(img)
 
