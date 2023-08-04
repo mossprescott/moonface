@@ -14,8 +14,8 @@ cd "$DIR/image"
 
 . env/bin/activate
 
-python dither.py "$DIR/resources/drawables"
-ls -lh "$DIR/resources/drawables"
+python dither.py "$DIR"
+# ls -lh "$DIR/resources/drawables"
 
 # Note: the compiler won't detect modified resources, so force it to rebuild them:
 rm -rf "$DIR/bin"

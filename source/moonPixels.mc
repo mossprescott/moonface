@@ -10,60 +10,6 @@ const MAX_ROWS_PER_UPDATE = 2;
 // rotated, and dithered at a selection of angles so that they can be drawn relatively
 // efficiently in whatever orientation is needed.
 class MoonPixels {
-    var bitmapKeys as Array<Symbol> = [
-        Rez.Drawables.Moon35_00,
-        Rez.Drawables.Moon35_01,
-        Rez.Drawables.Moon35_02,
-        Rez.Drawables.Moon35_03,
-        Rez.Drawables.Moon35_04,
-        Rez.Drawables.Moon35_05,
-        Rez.Drawables.Moon35_06,
-        Rez.Drawables.Moon35_07,
-        Rez.Drawables.Moon35_08,
-        Rez.Drawables.Moon35_09,
-        Rez.Drawables.Moon35_10,
-        Rez.Drawables.Moon35_11,
-        Rez.Drawables.Moon35_12,
-        Rez.Drawables.Moon35_13,
-        Rez.Drawables.Moon35_14,
-        Rez.Drawables.Moon35_15,
-        Rez.Drawables.Moon35_16,
-        Rez.Drawables.Moon35_17,
-        Rez.Drawables.Moon35_18,
-        Rez.Drawables.Moon35_19,
-        Rez.Drawables.Moon35_20,
-        Rez.Drawables.Moon35_21,
-        Rez.Drawables.Moon35_22,
-        Rez.Drawables.Moon35_23,
-        Rez.Drawables.Moon35_24,
-        Rez.Drawables.Moon35_25,
-        Rez.Drawables.Moon35_26,
-        Rez.Drawables.Moon35_27,
-        Rez.Drawables.Moon35_28,
-        Rez.Drawables.Moon35_29,
-        Rez.Drawables.Moon35_30,
-        Rez.Drawables.Moon35_31,
-        Rez.Drawables.Moon35_32,
-        Rez.Drawables.Moon35_33,
-        Rez.Drawables.Moon35_34,
-        Rez.Drawables.Moon35_35,
-        Rez.Drawables.Moon35_36,
-        Rez.Drawables.Moon35_37,
-        Rez.Drawables.Moon35_38,
-        Rez.Drawables.Moon35_39,
-        Rez.Drawables.Moon35_40,
-        Rez.Drawables.Moon35_41,
-        Rez.Drawables.Moon35_42,
-        Rez.Drawables.Moon35_43,
-        Rez.Drawables.Moon35_44,
-        Rez.Drawables.Moon35_45,
-        Rez.Drawables.Moon35_46,
-        Rez.Drawables.Moon35_47,
-        Rez.Drawables.Moon35_48,
-        Rez.Drawables.Moon35_49,
-    ] as Array<Symbol>;
-
-    var nativeRadius as Number;
     var stepAngle as Float;
 
     var savedBufferRef as BufferedBitmapReference?;
@@ -73,12 +19,10 @@ class MoonPixels {
     var rotate270 as AffineTransform;
 
     function initialize() {
-        nativeRadius = (WatchUi.loadResource(bitmapKeys[0]) as BitmapReference).getWidth()/2;
-
         // Angle in radians between one image and the next, always an even fraction of π/2. Within
         // any range of that size starting with the range centered at an angle of 0, the same
         // pixels will get drawn.
-        stepAngle = (2*Math.PI)/(4*bitmapKeys.size());
+        stepAngle = (2*Math.PI)/(4*MoonImages.count);
 
         // Rotation transforms:
         //    cos, -sin,  tx
@@ -88,26 +32,28 @@ class MoonPixels {
         // Note: setting the elements manually with setMatrix results in weird scaling, even though
         // the values seem to be identical.
 
+        var radius = 1.0*MoonImages.radius;
+
         rotate90 = new AffineTransform();
-        rotate90.translate(1.0*nativeRadius, 1.0*nativeRadius);
+        rotate90.translate(radius, radius);
         rotate90.rotate(Math.PI/2);
-        rotate90.translate(-1.0*nativeRadius, -1.0*nativeRadius);
+        rotate90.translate(-radius, -radius);
 
         rotate180 = new AffineTransform();
-        rotate180.translate(1.0*nativeRadius, 1.0*nativeRadius);
+        rotate180.translate(radius, radius);
         rotate180.rotate(Math.PI);
-        rotate180.translate(-1.0*nativeRadius, -1.0*nativeRadius);
+        rotate180.translate(-radius, -radius);
 
         rotate270 = new AffineTransform();
-        rotate270.translate(1.0*nativeRadius, 1.0*nativeRadius);
+        rotate270.translate(radius, radius);
         rotate270.rotate(Math.PI*3/2);
-        rotate270.translate(-1.0*nativeRadius, -1.0*nativeRadius);
+        rotate270.translate(-radius, -radius);
         // System.println(rotate270.getMatrix());
     }
 
     // The size for which drawing results in pixel-accurate dithering.
     function getNativeRadius() as Number {
-        return nativeRadius;
+        return MoonImages.radius;
     }
 
     // Draw the moon's face, at the given location and size, as specified by angle,
@@ -145,7 +91,7 @@ class MoonPixels {
         var turns = angle/(2*Math.PI);
         var turnFraction = turns - Math.floor(turns);
 
-        var imgIndex = (turnFraction*4*bitmapKeys.size()).toNumber() % bitmapKeys.size();
+        var imgIndex = (turnFraction*4*MoonImages.count).toNumber() % MoonImages.count;
         var rt;
         // System.println(Lang.format("turnFraction: $1$", [turnFraction]));
         if (turnFraction >= 0.75) {
@@ -158,8 +104,8 @@ class MoonPixels {
             rt = null;
         }
 
-        var img = WatchUi.loadResource(bitmapKeys[imgIndex]) as BitmapReference;
-        if (radius == nativeRadius) {
+        var img = WatchUi.loadResource(MoonImages.keys[imgIndex]) as BitmapReference;
+        if (radius == MoonImages.radius) {
             if (rt == null) {
                 dc.drawBitmap(0, 0, img);
             }
@@ -172,7 +118,7 @@ class MoonPixels {
             // This will spoil the dithering, but at small sizes it's not too noticeable
             // and that's what we're using it for.
             var st = new AffineTransform();
-            var sf = 1.0*radius/nativeRadius;
+            var sf = 1.0*radius/MoonImages.radius;
             st.scale(sf, sf);
             if (rt != null) { st.concatenate(rt); }
             dc.drawBitmap2(0, 0, img, { :transform => st });
@@ -211,7 +157,7 @@ class MoonPixels {
         var xsByRow = new Array<Array<Number>>[maxRow+1];
         for (var i = 0; i <= maxRow; i += 1) { xsByRow[i] = []; }
 
-        var majorAxis = radius;
+        var majorAxis = radius.toDouble();
 
         // Choose minor axis, avoiding very small values which trigger edge cases:
         // FIXME: handle small values much more cheaply with a simple linear cut. It does seem
