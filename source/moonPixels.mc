@@ -200,13 +200,15 @@ class MoonPixels {
         var xsByRow = new Array<Array<Number>>[maxRow+1];
         for (var i = 0; i <= maxRow; i += 1) { xsByRow[i] = []; }
 
-        var majorAxis = (radius + 0.5).toDouble();
+        var majorAxis = radius;
 
-        // Choose minor axis, avoiding very small values which could trigger edge cases:
+        // Choose minor axis, avoiding very small values which trigger edge cases:
+        // FIXME: handle small values much more cheaply with a simple linear cut. It does seem
+        // important to show the half moons precisely after all.
         // FIXME: something physically realistic?
         // FIXME: adjust duration of (apparent) new moon to be satisfying
         var minorAxis = majorAxis*(2*illuminationFraction - 1).abs();
-        if (minorAxis < 1.0) { minorAxis = 1.5d; }
+        if (minorAxis < 2.0) { minorAxis = 2.0d; }
 
         var sin = Math.sin(parallacticAngle);
         var cos = Math.cos(parallacticAngle);
