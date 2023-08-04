@@ -190,6 +190,17 @@ class MoonPixels {
     // profiler. That's plausible, because of all the method calls and member references. Keeping it
     // all in one ugly function means only fast local variable access, even though the code is larger
     // and uglier.
+    //
+    // FIXME: this all assumes the ellipse is centered on a whole pixel, and radius is a whole number.
+    // In effect, that means the dimensions are 2*radius + 1, whereas the image is actually
+    // 2*radius in width and height. Therefore everything is just slighty out of alignment, with the
+    // ellipse overshooting the bottom right by one pixel in each direction. Fix it by adjusting
+    // A,B,C,D to account for the offset?
+    // That would make the test somewhat more complex:
+    //     sigma = Ax^2 + Bxy + Cy^2 + (A + B/2)x + (C + B/2)y + (A/4 + C/4 - D)
+    // (probably would pre-compute D, E, and F, of course).
+    // Alternatively, just make the original image size the odd number. Is it important to handle both
+    // cases for some reason?
     private function clearShadow(dc as Dc, radius as Number,
                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
 
