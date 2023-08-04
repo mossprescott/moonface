@@ -157,7 +157,7 @@ class MoonPixels {
         var xsByRow = new Array<Array<Number>>[maxRow+1];
         for (var i = 0; i <= maxRow; i += 1) { xsByRow[i] = []; }
 
-        var majorAxis = radius.toDouble();
+        var majorAxis = radius + 0.5d;
 
         // Choose minor axis, avoiding very small values which trigger edge cases:
         // FIXME: handle small values much more cheaply with a simple linear cut. It does seem
@@ -469,7 +469,7 @@ class MoonPixels {
     }
 
     private function getBuffer(radius as Number) as BufferedBitmap {
-        var size = radius*2;
+        var size = radius*2 + 1;
 
         if (savedBufferRef != null) {
             var buffer = savedBufferRef.get() as BufferedBitmap?;

@@ -68,7 +68,7 @@ def munge(img, angle, radius):
 
     img = img.rotate(-angle, resample=Resampling.BICUBIC, fillcolor=(0, 0, 0))
 
-    img = img.resize((2*radius, 2*radius), resample=Resampling.BICUBIC)
+    img = img.resize((2*radius + 1, 2*radius + 1), resample=Resampling.BICUBIC)
 
     img = dither_mask(img)
 
