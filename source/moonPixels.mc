@@ -193,53 +193,6 @@ class MoonPixels {
     private function clearShadow(dc as Dc, radius as Number,
                         parallacticAngle as Decimal, illuminationFraction as Decimal, phase as Decimal) as Void {
 
-        // Note: the y-axis is reversed on the display from the terms used here, so "up" means
-        // increasing y, which is actually down on the screen.
-
-        // Note: this algorithm traces pixels that are definitely outside the ellipse. Probably want
-        // to account for that by erasing to the inside edge of the traced outline.
-
-        // Select a point on each axis such that:
-        // xa, ya: axis in the first quadrant (xa > 0, ya >= 0), with xa >= ya
-        // xb, yb: axis in the second quadrant
-
-        var majorAxis = (radius + 0.5).toDouble();
-        var xa = -Math.sin(parallacticAngle)*majorAxis;
-        var ya = Math.cos(parallacticAngle)*majorAxis;
-
-        // Choose minor axis, avoiding very small values which could trigger edge cases:
-        // FIXME: something physically realistic?
-        // FIXME: adjust duration of (apparent) new moon to be satisfying
-        var minorAxis = majorAxis*(2*illuminationFraction - 1).abs();
-        if (minorAxis < 1.0) { minorAxis = 1.5d; }
-        var xb = Math.cos(parallacticAngle)*minorAxis;
-        var yb = Math.sin(parallacticAngle)*minorAxis;
-
-        // Choose coords such that ya and yb >= 0:
-        if (ya < 0) { xa = -xa; ya = -ya; }
-        if (yb < 0) { xb = -xb; yb = -yb; }
-        // ... and xa > 0:
-        if (xa < 0) {
-            var tmp;
-            tmp = xa; xa = xb; xb = tmp;
-            tmp = ya; ya = yb; yb = tmp;
-        }
-
-        // The ellipse is points (x,y) where Ax^2 + 2Bxy + Cy^2 - D = 0
-        // Tricky: x(y)a(b) can be small, but not all of them. Using Double for everything
-        // avoids any early rounding. At the end, convert everything to Float, which the
-        // VM handles more efficiently than Long. The paper uses 64-bit integers, because
-        // we don't need any precision past the decimal point, but it was written when
-        // floating-point wasn't cheap the way it probably is now.
-        var asq = xa*xa + ya*ya;
-        var asqs = asq*asq;
-        var bsq = xb*xb + yb*yb;
-        var bsqs = bsq*bsq;
-        var A = (xa*xa*bsqs + xb*xb*asqs).toFloat();
-        var B = (xa*ya*bsqs + xb*yb*asqs).toFloat();
-        var C = (ya*ya*bsqs + yb*yb*asqs).toFloat();
-        var D = (asqs*bsqs).toFloat();
-
         // We'll accumulate every x-coord we trace for each non-negative y coord, then reduce them
         // afterward. This isn't the most efficient way to store them, but it makes the repeated code
         // simple, and we know the total number of such coords is O(radius).
@@ -247,259 +200,313 @@ class MoonPixels {
         var xsByRow = new Array<Array<Number>>[maxRow+1];
         for (var i = 0; i <= maxRow; i += 1) { xsByRow[i] = []; }
 
-        if ((A == 0.0 and B == 0.0) or (C == 0.0 and D == 0.0)) {
-            System.println("Zero coefficients! Skip for now");
-        }
-        // else if (xa == 0) {
-        //     System.println("xa is 0. Skip for now");
-        //     // Axis-aligned:
-        //     // Necessary because zero coefficients create infinite loops?
-        // }
-        else {
-            var x = Math.round(-xa).toNumber();
-            var y = Math.round(-ya).toNumber();
-            var dx = B*x + C*y;
-            var dy = -(A*x + B*y);
+        var majorAxis = (radius + 0.5).toDouble();
 
-            // First advance to a point where the magnitude of slope is >= 1, without
-            // recording any pixels:
-            if (x > y) {
-                // Arc 0: (-xa, -ya) left and maybe up until the slope is -1; x-- (y++)
-                while (-dy > dx) {
-                    // Choose between (x-1, y) and (x-1, y+1).
-                    // Test (x-1, y+1); if inside, then go to (x-1, y), otherwise (x-1, y+1)
-                    x -= 1;
-                    var sigma = A*x*x + 2*B*x*(y+1) + C*(y+1)*(y+1) - D;
+        // Choose minor axis, avoiding very small values which could trigger edge cases:
+        // FIXME: something physically realistic?
+        // FIXME: adjust duration of (apparent) new moon to be satisfying
+        var minorAxis = majorAxis*(2*illuminationFraction - 1).abs();
+        if (minorAxis < 1.0) { minorAxis = 1.5d; }
+
+        var sin = Math.sin(parallacticAngle);
+        var cos = Math.cos(parallacticAngle);
+
+        {
+            // Note: the y-axis is reversed on the display from the terms used here, so "up" means
+            // increasing y, which is actually down on the screen.
+
+            // Note: this algorithm traces pixels that are definitely outside the ellipse. Probably want
+            // to account for that by erasing to the inside edge of the traced outline.
+
+            // Select a point on each axis such that:
+            // xa, ya: axis in the first quadrant (xa > 0, ya >= 0), with xa >= ya
+            // xb, yb: axis in the second quadrant
+
+            var xa = -sin*majorAxis;
+            var ya = cos*majorAxis;
+
+            var xb = cos*minorAxis;
+            var yb = sin*minorAxis;
+
+            // Choose coords such that ya and yb >= 0:
+            if (ya < 0) { xa = -xa; ya = -ya; }
+            if (yb < 0) { xb = -xb; yb = -yb; }
+            // ... and xa > 0:
+            if (xa < 0) {
+                var tmp;
+                tmp = xa; xa = xb; xb = tmp;
+                tmp = ya; ya = yb; yb = tmp;
+            }
+
+            // The ellipse is points (x,y) where Ax^2 + 2Bxy + Cy^2 - D = 0
+            // Tricky: x(y)a(b) can be small, but not all of them. Using Double for everything
+            // avoids any early rounding. At the end, convert everything to Float, which the
+            // VM handles more efficiently than Long. The paper uses 64-bit integers, because
+            // we don't need any precision past the decimal point, but it was written when
+            // floating-point wasn't cheap the way it probably is now.
+            var asq = xa*xa + ya*ya;
+            var asqs = asq*asq;
+            var bsq = xb*xb + yb*yb;
+            var bsqs = bsq*bsq;
+            var A = (xa*xa*bsqs + xb*xb*asqs).toFloat();
+            var B = (xa*ya*bsqs + xb*yb*asqs).toFloat();
+            var C = (ya*ya*bsqs + yb*yb*asqs).toFloat();
+            var D = (asqs*bsqs).toFloat();
+
+            if ((A == 0.0 and B == 0.0) or (C == 0.0 and D == 0.0)) {
+                System.println("Zero coefficients! Skip for now");
+            }
+            else if (xa == 0 or ya == 0) {
+                System.println("xa or ya is 0. Skip for now");
+                // Axis-aligned:
+                // Possibly causing glitchy drawing
+            }
+            else {
+                var x = Math.round(-xa).toNumber();
+                var y = Math.round(-ya).toNumber();
+                var dx = B*x + C*y;
+                var dy = -(A*x + B*y);
+
+                // First advance to a point where the magnitude of slope is >= 1, without
+                // recording any pixels:
+                if (x > y) {
+                    // Arc 0: (-xa, -ya) left and maybe up until the slope is -1; x-- (y++)
+                    while (-dy > dx) {
+                        // Choose between (x-1, y) and (x-1, y+1).
+                        // Test (x-1, y+1); if inside, then go to (x-1, y), otherwise (x-1, y+1)
+                        x -= 1;
+                        var sigma = A*x*x + 2*B*x*(y+1) + C*(y+1)*(y+1) - D;
+                        if (sigma >= 0) {
+                            dx += C;
+                            dy -= B;
+                            y += 1;
+                        }
+                        dx -= B;
+                        dy += A;
+                    }
+                }
+
+                // Arc 1: up and maybe left until the tangent is vertical; y++ (x--)
+                while (dx <= 0) {
+                    if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                    if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
+
+                    // Choose between (x, y+1) and (x-1, y+1).
+                    // Test (x, y+1); if inside, then go to (x-1, y+1), otherwise (x, y+1)
+                    y += 1;
+                    var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+                    if (sigma < 0) {
+                        dx -= B;
+                        dy += A;
+                        x -= 1;
+                    }
+                    dx += C;
+                    dy -= B;
+                }
+
+                // Arc 2: up and maybe right until slope = 1; y++ (x++)
+                while (dy > dx) {
+                    if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                    if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
+
+                    // Choose between (x, y+1) and (x+1, y+1).
+                    // Test (x+1, y+1); if inside, then go to (x, y+1), otherwise (x+1, y+1)
+                    y += 1;
+                    var sigma = A*(x+1)*(x+1) + 2*B*(x+1)*y + C*y*y - D;
                     if (sigma >= 0) {
+                        dx += B;
+                        dy -= A;
+                        x += 1;
+                    }
+                    dx += C;
+                    dy -= B;
+                }
+
+                // Arc 3: right and maybe up until tangent is horizontal; x++ (y++)
+                while (dy >= 0) {
+                    if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                    if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
+
+                    // Choose between (x+1, y) and (x+1, y+1).
+                    // Test (x+1, y); if inside, then go to (x+1, y+1), otherwise (x+1, y)
+                    x += 1;
+                    var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+                    if (sigma < 0) {
                         dx += C;
                         dy -= B;
                         y += 1;
                     }
-                    dx -= B;
-                    dy += A;
-                }
-            }
-
-            // Arc 1: up and maybe left until the tangent is vertical; y++ (x--)
-            while (dx <= 0) {
-                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
-                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
-
-                // Choose between (x, y+1) and (x-1, y+1).
-                // Test (x, y+1); if inside, then go to (x-1, y+1), otherwise (x, y+1)
-                y += 1;
-                var sigma = A*x*x + 2*B*x*y + C*y*y - D;
-                if (sigma < 0) {
-                    dx -= B;
-                    dy += A;
-                    x -= 1;
-                }
-                dx += C;
-                dy -= B;
-            }
-
-            // Arc 2: up and maybe right until slope = 1; y++ (x++)
-            while (dy > dx) {
-                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
-                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
-
-                // Choose between (x, y+1) and (x+1, y+1).
-                // Test (x+1, y+1); if inside, then go to (x, y+1), otherwise (x+1, y+1)
-                y += 1;
-                var sigma = A*(x+1)*(x+1) + 2*B*(x+1)*y + C*y*y - D;
-                if (sigma >= 0) {
                     dx += B;
                     dy -= A;
+                }
+
+                // Arc 4: right and maybe down until the slope is -1; x++ (y--)
+                while (-dy < dx) {
+                    if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                    if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
+
+                    // Choose between (x+1, y) and (x+1, y-1).
+                    // Test (x+1, y-1); if inside, then go to (x+1, y), otherwise (x+1, y-1)
                     x += 1;
+                    var sigma = A*x*x + 2*B*x*(y-1) + C*(y-1)*(y-1) - D;
+                    if (sigma >= 0) {
+                        dx -= C;
+                        dy += B;
+                        y -= 1;
+                    }
+                    dx += B;
+                    dy -= A;
                 }
-                dx += C;
-                dy -= B;
-            }
 
-            // Arc 3: right and maybe up until tangent is horizontal; x++ (y++)
-            while (dy >= 0) {
-                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
-                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
+                // Arc 5: down and maybe right until (xa, ya); y-- (x++)
+                while (y > ya) {
+                    if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
+                    if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
 
-                // Choose between (x+1, y) and (x+1, y+1).
-                // Test (x+1, y); if inside, then go to (x+1, y+1), otherwise (x+1, y)
-                x += 1;
-                var sigma = A*x*x + 2*B*x*y + C*y*y - D;
-                if (sigma < 0) {
-                    dx += C;
-                    dy -= B;
-                    y += 1;
-                }
-                dx += B;
-                dy -= A;
-            }
-
-            // Arc 4: right and maybe down until the slope is -1; x++ (y--)
-            while (-dy < dx) {
-                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
-                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
-
-                // Choose between (x+1, y) and (x+1, y-1).
-                // Test (x+1, y-1); if inside, then go to (x+1, y), otherwise (x+1, y-1)
-                x += 1;
-                var sigma = A*x*x + 2*B*x*(y-1) + C*(y-1)*(y-1) - D;
-                if (sigma >= 0) {
+                    // Choose between (x, y-1) and (x+1, y-1).
+                    // Test (x, y-1); if inside, then go to (x+1, y-1), otherwise (x, y-1)
+                    y -= 1;
+                    var sigma = A*x*x + 2*B*x*y + C*y*y - D;
+                    if (sigma < 0) {
+                        dx += B;
+                        dy -= A;
+                        x += 1;
+                    }
                     dx -= C;
                     dy += B;
-                    y -= 1;
                 }
-                dx += B;
-                dy -= A;
-            }
-
-            // Arc 5: down and maybe right until (xa, ya); y-- (x++)
-            while (y > ya) {
-                if (y >= 0 and y <=  maxRow) { xsByRow[ y].add( x); }
-                if (y <= 0 and y >= -maxRow) { xsByRow[-y].add(-x); }
-
-                // Choose between (x, y-1) and (x+1, y-1).
-                // Test (x, y-1); if inside, then go to (x+1, y-1), otherwise (x, y-1)
-                y -= 1;
-                var sigma = A*x*x + 2*B*x*y + C*y*y - D;
-                if (sigma < 0) {
-                    dx += B;
-                    dy -= A;
-                    x += 1;
-                }
-                dx -= C;
-                dy += B;
             }
         }
 
         // Now look at the traced coords a row at a time and figure out which portion to erase.
+        {
+            // Of the three regions, inside and outside of the ellipse, which are in shadow and need
+            // to be erased. This is left/right in terms of the un-rotated image.
+            var eraseLeft = phase < 0.5;
+            var eraseCenter = illuminationFraction < 0.5;
+            var eraseRight = phase > 0.5;
+            var upIsLeft = sin > 0;
+            var leftIsRight = cos < 0;
 
-        // Of the three regions, inside and outside of the ellipse, which are in shadow and need
-        // to be erased. This is left/right in terms of the un-rotated image.
-        var eraseLeft = phase < 0.5;
-        var eraseCenter = illuminationFraction < 0.5;
-        var eraseRight = phase > 0.5;
-        var upIsLeft = Math.sin(parallacticAngle) > 0;
-        var leftIsRight = Math.cos(parallacticAngle) < 0;
+            // Reflect regions based on current rotation:
+            var eraseScreenLeft = leftIsRight ? eraseRight : eraseLeft;
+            var eraseScreenRight = leftIsRight ? eraseLeft : eraseRight;
+            var eraseScreenUp = upIsLeft ? eraseLeft : eraseRight;
+            var eraseScreenDown = upIsLeft ? eraseRight : eraseLeft;
 
-        // Reflect regions based on current rotation:
-        var eraseScreenLeft = leftIsRight ? eraseRight : eraseLeft;
-        var eraseScreenRight = leftIsRight ? eraseLeft : eraseRight;
-        var eraseScreenUp = upIsLeft ? eraseLeft : eraseRight;
-        var eraseScreenDown = upIsLeft ? eraseRight : eraseLeft;
+            // Positive y-coord of the point on the major axis (aka ya, before selecting for quadrants):
+            var y1 = (cos*majorAxis).abs().toNumber();
 
-        // Positive y-coord of the point on the major axis (aka ya, before selecting for quadrants):
-        var y1 = (Math.cos(parallacticAngle)*majorAxis).abs().toNumber();
-
-        // FIXME: note re-definition of x and y
-        for (var y = 0; y <= radius; y += 1) {
-            var xs = xsByRow[y];
-            var count = xs.size();
-            if (count == 0) {
-                // This row is entirely outside the ellipse, so it's either all "left" or all "right".
-                if ((upIsLeft and eraseLeft) or (!upIsLeft and eraseRight)) {
-                    dc.setClip(0, radius - y, radius*2, 1);
-                    dc.clear();
+            for (var y = 0; y <= radius; y += 1) {
+                var xs = xsByRow[y];
+                var count = xs.size();
+                if (count == 0) {
+                    // This row is entirely outside the ellipse, so it's either all "left" or all "right".
+                    if (eraseScreenUp) {
+                        dc.setClip(0, radius - y, radius*2, 1);
+                        dc.clear();
+                    }
+                    if (eraseScreenDown) {
+                        dc.setClip(0, radius + y, radius*2, 1);
+                        dc.clear();
+                    }
                 }
-                if ((upIsLeft and eraseRight) or (!upIsLeft and eraseLeft)) {
-                    dc.setClip(0, radius + y, radius*2, 1);
-                    dc.clear();
+                else {
+                    var minX = xs[0];
+                    var maxX = xs[0];
+                    for (var i = 1; i < count; i += 1) {
+                        var x = xs[i] as Number;
+                        if (x < minX) { minX = x; }
+                        if (x > maxX) { maxX = x; }
+                    }
+
+                    // First, the row with -y:
+                    {
+                        var erase0;
+                        if (y >= y1) { erase0 = eraseScreenUp; }
+                        else         { erase0 = eraseScreenLeft; }
+                        var erase1 = eraseCenter;
+                        var erase2;
+                        if (y >= y1) { erase2 = eraseScreenUp; }
+                        else         { erase2 = eraseScreenRight; }
+
+                        if (erase0 and !erase1 and erase2) {
+                            // Erase on each side:
+                            dc.setClip(radius + -radius, radius - y, -maxX - (-radius) + 1, 1);
+                            dc.clear();
+                            dc.setClip(radius + -minX, radius - y, radius - (-minX) + 1, 1);
+                            dc.clear();
+                        }
+                        else if (erase0 or erase1 or erase2) {
+                            // Erase one or two regions on the same side at once:
+
+                            // First and last pixels to erase; both are included
+                            var eraseL = -radius;
+                            var eraseR = radius;
+
+                            if (!erase0 and erase1)      { eraseL = -maxX+1; }
+                            else if (!erase1 and erase2) { eraseL = -minX;   }
+
+                            if (erase0 and !erase1)      { eraseR = -maxX;   }
+                            else if (erase1 and !erase2) { eraseR = -minX-1; }
+
+                            dc.setClip(radius + eraseL, radius - y, eraseR - eraseL + 1, 1);
+                            dc.clear();
+                        }
+                    }
+
+                    // Now, the row with +y:
+                    {
+                        var erase0;
+                        if (y >= y1) { erase0 = eraseScreenDown; }
+                        else         { erase0 = eraseScreenLeft; }
+                        var erase1 = eraseCenter;
+                        var erase2;
+                        if (y >= y1) { erase2 = eraseScreenDown; }
+                        else         { erase2 = eraseScreenRight; }
+
+                        if (erase0 and !erase1 and erase2) {
+                            // Erase on each side:
+                            dc.setClip(radius + -radius, radius + y, minX - (-radius) + 1, 1);
+                            dc.clear();
+                            dc.setClip(radius + maxX, radius + y, radius - maxX + 1, 1);
+                            dc.clear();
+                        }
+                        else if (erase0 or erase1 or erase2) {
+                            // Erase one or two regions on the same side at once:
+
+                            // First and last pixels to erase; both are included
+                            var eraseL = -radius;
+                            var eraseR = radius;
+
+                            if (!erase0 and erase1)      { eraseL = minX+1; }
+                            else if (!erase1 and erase2) { eraseL = maxX;   }
+
+                            if (erase0 and !erase1)      { eraseR = minX;   }
+                            else if (erase1 and !erase2) { eraseR = maxX-1; }
+
+                            dc.setClip(radius + eraseL, radius + y, eraseR - eraseL + 1, 1);
+                            dc.clear();
+                        }
+                    }
+
+                    var DEBUG_ELLIPSE = false;
+                    if (DEBUG_ELLIPSE) {
+                        // For debug purposes, render the ellipse boundaries in each row.
+                        // Note: the boundary pixels are considered to be outside of "center",
+                        // so they draw on top of the left/right region.
+                        dc.clearClip();
+                        dc.setColor(leftIsRight ? Graphics.COLOR_GREEN : Graphics.COLOR_RED, -1);
+                        dc.drawPoint(radius + minX, radius + y);
+                        dc.drawPoint(radius - maxX, radius - y);
+                        dc.setColor(leftIsRight ? Graphics.COLOR_RED : Graphics.COLOR_GREEN, -1);
+                        dc.drawPoint(radius + maxX, radius + y);
+                        dc.drawPoint(radius - minX, radius - y);
+                    }
                 }
             }
-            else {
-                var minX = xs[0];
-                var maxX = xs[0];
-                for (var i = 1; i < count; i += 1) {
-                    var x = xs[i] as Number;
-                    if (x < minX) { minX = x; }
-                    if (x > maxX) { maxX = x; }
-                }
-
-                // First, the row with -y:
-                {
-                    var erase0;
-                    if (y >= y1) { erase0 = eraseScreenUp; }
-                    else         { erase0 = eraseScreenLeft; }
-                    var erase1 = eraseCenter;
-                    var erase2;
-                    if (y >= y1) { erase2 = eraseScreenUp; }
-                    else         { erase2 = eraseScreenRight; }
-
-                    if (erase0 and !erase1 and erase2) {
-                        // Erase on each side:
-                        dc.setClip(radius + -radius, radius - y, -maxX - (-radius) + 1, 1);
-                        dc.clear();
-                        dc.setClip(radius + -minX, radius - y, radius - (-minX) + 1, 1);
-                        dc.clear();
-                    }
-                    else if (erase0 or erase1 or erase2) {
-                        // Erase one or two regions on the same side at once:
-
-                        // First and last pixels to erase; both are included
-                        var eraseL = -radius;
-                        var eraseR = radius;
-
-                        if (!erase0 and erase1)      { eraseL = -maxX+1; }
-                        else if (!erase1 and erase2) { eraseL = -minX;   }
-
-                        if (erase0 and !erase1)      { eraseR = -maxX;   }
-                        else if (erase1 and !erase2) { eraseR = -minX-1; }
-
-                        dc.setClip(radius + eraseL, radius - y, eraseR - eraseL + 1, 1);
-                        dc.clear();
-                    }
-                }
-
-                // Now, the row with +y:
-                {
-                    var erase0;
-                    if (y >= y1) { erase0 = eraseScreenDown; }
-                    else         { erase0 = eraseScreenLeft; }
-                    var erase1 = eraseCenter;
-                    var erase2;
-                    if (y >= y1) { erase2 = eraseScreenDown; }
-                    else         { erase2 = eraseScreenRight; }
-
-                    if (erase0 and !erase1 and erase2) {
-                        // Erase on each side:
-                        dc.setClip(radius + -radius, radius + y, minX - (-radius) + 1, 1);
-                        dc.clear();
-                        dc.setClip(radius + maxX, radius + y, radius - maxX + 1, 1);
-                        dc.clear();
-                    }
-                    else if (erase0 or erase1 or erase2) {
-                        // Erase one or two regions on the same side at once:
-
-                        // First and last pixels to erase; both are included
-                        var eraseL = -radius;
-                        var eraseR = radius;
-
-                        if (!erase0 and erase1)      { eraseL = minX+1; }
-                        else if (!erase1 and erase2) { eraseL = maxX;   }
-
-                        if (erase0 and !erase1)      { eraseR = minX;   }
-                        else if (erase1 and !erase2) { eraseR = maxX-1; }
-
-                        dc.setClip(radius + eraseL, radius + y, eraseR - eraseL + 1, 1);
-                        dc.clear();
-                    }
-                }
-
-                var DEBUG_ELLIPSE = true;
-                if (DEBUG_ELLIPSE) {
-                    // For debug purposes, render the ellipse boundaries in each row.
-                    // Note: the boundary pixels are considered to be outside of "center",
-                    // so they draw on top of the left/right region.
-                    dc.clearClip();
-                    dc.setColor(leftIsRight ? Graphics.COLOR_GREEN : Graphics.COLOR_RED, -1);
-                    dc.drawPoint(radius + minX, radius + y);
-                    dc.drawPoint(radius - maxX, radius - y);
-                    dc.setColor(leftIsRight ? Graphics.COLOR_RED : Graphics.COLOR_GREEN, -1);
-                    dc.drawPoint(radius + maxX, radius + y);
-                    dc.drawPoint(radius - minX, radius - y);
-                }
-            }
+            dc.clearClip();
         }
-        dc.clearClip();
     }
 
     private function getBuffer(radius as Number) as BufferedBitmap {
