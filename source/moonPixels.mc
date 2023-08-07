@@ -34,6 +34,11 @@ class MoonPixels {
 
         var radius = 1.0*MoonImages.radius;
 
+        if (!(Toybox.Graphics has :AffineTransform)) {
+            System.println(Lang.format("API version: $1$", [ System.getDeviceSettings().monkeyVersion ]));
+            System.error("Missing AffineTransform");
+        }
+
         rotate90 = new AffineTransform();
         rotate90.translate(radius, radius);
         rotate90.rotate(Math.PI/2);
